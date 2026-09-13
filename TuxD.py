@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.7.175"
+VERSION = "2.0.0"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -233,7 +233,7 @@ def print_banner(enabled):
             print(c(center_text(line, cols), RED, BOLD))
             lines += 1
 
-    print(c(center_text("Linux MQTT Agent for Home Assistant", cols), WHITE, BOLD))
+    print(c(center_text("A lightweight agent to monitor and manage *nix systems via Home Assistant over MQTT.", cols), WHITE, BOLD))
     lines += 1
     print(c(center_text(f"Version {VERSION}", cols), GRAY, BOLD))
     lines += 1
@@ -595,11 +595,15 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
                 time.sleep(0.33)
 
     if new_launcher.exists():
-        dest_launcher = project_root / "TuxD.py"
+
+
+
+
+        dest_launcher = Path(__file__).resolve()
         if dest_launcher.exists():
             rb.backup_file_if_exists(dest_launcher)
 
-        tmp_launcher = project_root / ".TuxD.py.tmp"
+        tmp_launcher = dest_launcher.parent / f".{dest_launcher.name}.tmp"
         _safe_copy(new_launcher, tmp_launcher)
         _safe_replace(tmp_launcher, dest_launcher)
 
@@ -607,6 +611,18 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
             time.sleep(3)
             print(c("Successfully updated application:", GREEN), str(dest_launcher))
             time.sleep(1)
+
+
+def _run_upgrade_hook(project_root: Path, enabled: bool):
+    hook = project_root / "bin" / "upgrade" / "preperations.sh"
+    if not hook.exists():
+        return
+    try:
+        if enabled:
+            print(c("Running upgrade hook...", WHITE, DIM, BOLD))
+        subprocess.run(["bash", str(hook)], cwd=str(project_root), timeout=60)
+    except Exception:
+        pass
 
 
 def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
@@ -648,6 +664,8 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
             raise RuntimeError("Installed integrity check failed (compileall)")
 
         clear_version_failed(new_version)
+
+        _run_upgrade_hook(project_root, enabled)
 
         if enabled:
             print(c("Update applied successfully", GREEN, BOLD))
@@ -886,8 +904,33 @@ def _signal_handler(signum, frame):
     raise SystemExit(0)
 
 
+def _migrate_legacy_folder_name():
+    project_root = Path(__file__).resolve().parent
+    if project_root.name.lower() != "py-k93sys":
+        return
+
+    new_root = project_root.parent / "TuxD"
+    if new_root.exists():
+        return
+
+    try:
+        os.rename(str(project_root), str(new_root))
+    except Exception:
+        return
+
+    new_script = new_root / "TuxD.py"
+    try:
+        os.chdir(str(new_root))
+    except Exception:
+        pass
+
+    os.execv(sys.executable, [sys.executable, str(new_script)] + sys.argv[1:])
+
+
 def main():
     global _TTY_ENABLED, _LOG_FILE, _LOG_ROTATE_THREAD, _STATUS, _AGENT
+
+    _migrate_legacy_folder_name()
 
 
     _db = _db_read()
