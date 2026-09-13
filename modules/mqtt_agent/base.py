@@ -38,7 +38,7 @@ class HAMQTTBase:
         self.version = version
         self.log_file = log_file
         self.client = mqtt.Client()
-        self.base_topic = f"K93SYS{config['device']['name']}"
+        self.base_topic = f"TuxD{config['device']['name']}"
         self.device_slug = slugify(config["device"]["name"])
 
         self.tty_output = config["device"].get("tty_output", False)
@@ -50,7 +50,7 @@ class HAMQTTBase:
             "identifiers": [config["device"]["name"]],
             "name": config["device"]["name"],
             "manufacturer": "Henrik Isefjær Olsen",
-            "model": f"K93SYS Linux Agent Version {self.version}",
+            "model": f"TuxD Linux Agent Version {self.version}",
             "sw_version": self.version
         }
 

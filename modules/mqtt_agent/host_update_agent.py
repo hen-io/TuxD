@@ -222,7 +222,7 @@ class HostUpdateMixin:
             if self._terminal_output_enabled():
                 self.publish(
                     self.terminal_output_topic,
-                    "Host update finished, restarting Py-K93SYS to refresh state...",
+                    "Host update finished, restarting TuxD to refresh state...",
                 )
                 time.sleep(0.5)
         except Exception:

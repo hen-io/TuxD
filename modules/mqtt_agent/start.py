@@ -198,7 +198,7 @@ class HAMQTTAgent(
         try:
             if self._terminal_output_enabled():
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
-                self.publish(self.terminal_output_topic, f"{ts}: K93SYS Startup complete")
+                self.publish(self.terminal_output_topic, f"{ts}: TuxD Startup complete")
         except Exception:
             pass
 

@@ -32,21 +32,6 @@ def _make_separator(title: str) -> str:
 
 
 def _parse_conf_vars(text: str) -> tuple:
-    """
-    Parse conf_vars_defaults.yaml raw text to extract section metadata.
-
-    Returns:
-      section_labels  – {yaml_key: separator_title}
-      section_samples – {yaml_key: sample_comment_block_str}
-
-    Separator boxes are detected as three consecutive lines:
-      #################################
-      # Title                         #
-      #################################
-    The first top-level (non-indented) non-comment line after each box is the
-    YAML key for that section.  A contiguous run of '#'-prefixed lines starting
-    with '# Example' (at column 0) is treated as that section's sample block.
-    """
     section_labels = {}
     section_samples = {}
     lines = text.splitlines(keepends=True)
@@ -96,12 +81,6 @@ def _parse_conf_vars(text: str) -> tuple:
 
 
 def _migrate_interval_keys(config: dict) -> bool:
-    """
-    One-time migration: rename 'interval' → 'update_interval' in every section
-    that uses it as the delay-between-runs setting.  Only renames when 'interval'
-    is present and 'update_interval' is not, so existing update_interval values
-    are never overwritten.
-    """
     changed = False
 
     def _rename(d: dict) -> bool:
@@ -133,11 +112,6 @@ def _migrate_interval_keys(config: dict) -> bool:
 
 
 def _deep_merge_defaults(config: dict, defaults: dict) -> bool:
-    """
-    Recursively add keys from `defaults` that are missing in `config`.
-    Dict values are merged recursively; lists and scalars are only added when
-    the key is absent entirely.  Returns True if any key was added.
-    """
     changed = False
     for key, default_val in defaults.items():
         if key not in config:
@@ -150,11 +124,6 @@ def _deep_merge_defaults(config: dict, defaults: dict) -> bool:
 
 
 def _extract_header_comments(text: str) -> str:
-    """
-    Return the leading ASCII-art / comment block that precedes any separator
-    bar.  Stops at the first '#################################' line so that
-    previously injected separators are never included in the header.
-    """
     lines = text.splitlines(keepends=True)
     header = []
     for line in lines:
@@ -179,11 +148,6 @@ def _samples_present(text: str, sample_markers: dict) -> set:
 
 def _inject_separators_and_samples(yaml_text: str, keys_in_config: set,
                                     section_labels: dict, section_samples: dict) -> str:
-    """
-    Walk yaml.dump output line by line:
-    - Before each known top-level key: prepend a separator box.
-    - After each section's content: append the section's sample comment.
-    """
     lines = yaml_text.splitlines(keepends=True)
     output = []
     current_section = None
@@ -229,13 +193,6 @@ def _apply_item_defaults(config: dict, item_defaults: dict) -> bool:
 
 
 def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str = None) -> bool:
-    """
-    Inject any entries missing from config_path that are defined in
-    conf_vars_path, add section separator comments and sample entries where
-    absent or outdated.  Existing values are never overwritten.
-
-    Returns True if config_path was updated.
-    """
     config_file = Path(config_path)
     conf_vars_file = Path(conf_vars_path)
     if not conf_vars_file.exists() or not config_file.exists():

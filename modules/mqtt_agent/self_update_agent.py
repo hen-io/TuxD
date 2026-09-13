@@ -17,12 +17,12 @@ class SelfUpdateMixin:
 
         self._update_discovery(
             "self_update",
-            "Py-K93SYS",
+            "TuxD",
             f"{base}/state",
             command_topic=command_topic,
             icon="mdi:update",
             entity_category="diagnostic",
-            ha_object_id=f"{self.device_slug}_py_k93sys",
+            ha_object_id=f"{self.device_slug}_tuxd",
         )
 
 
@@ -39,7 +39,7 @@ class SelfUpdateMixin:
                 json.dumps({
                     "installed_version": self.version,
                     "latest_version": self.version,
-                    "title": "Py-K93SYS",
+                    "title": "TuxD",
                     "in_progress": False,
                 }),
                 retain=True,
@@ -60,7 +60,7 @@ class SelfUpdateMixin:
         state = {
             "installed_version": self.version,
             "latest_version": new_version if new_version else self.version,
-            "title": "Py-K93SYS",
+            "title": "TuxD",
         }
         if new_version and src_type:
             state["release_summary"] = f"{new_version} available via the {src_type} update source."
@@ -98,9 +98,9 @@ class SelfUpdateMixin:
             if not new_version or not src_type or not src_val:
                 return
             self._set_self_update_progress(True)
-            self.set_error(True, "Py-K93SYS update installing, restarting")
+            self.set_error(True, "TuxD update installing, restarting")
             if self._terminal_output_enabled():
-                self.publish(self.terminal_output_topic, f"Installing Py-K93SYS {new_version}...")
+                self.publish(self.terminal_output_topic, f"Installing TuxD {new_version}...")
             self._update_applier(new_version, src_type, src_val)
         except Exception:
             self._set_self_update_progress(False)

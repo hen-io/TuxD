@@ -40,7 +40,6 @@ def _midnight_ts():
 
 
 def _read_last_line(path, log_type="json"):
-    """Returns (result, None) on success, (None, error_str) on failure."""
     try:
         with open(path, "rb") as f:
             f.seek(0, 2)
@@ -173,7 +172,6 @@ class LogSensorMixin:
         return result
 
     def _hits_db_save(self):
-        """Must be called with self._hits_lock held."""
         data = self._db_read()
         data["logreader_hits"] = self._hits_to_db_dict()
         self._db_write(data)

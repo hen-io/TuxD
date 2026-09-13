@@ -22,14 +22,14 @@ import re
 VERSION = "1.7.175"
 
 CONFIG_PATH = "config.yaml"
-RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/releases"
-LOG_FILE_PATH = "k93sys.log"
+RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
+LOG_FILE_PATH = "tuxd.log"
 
 UPDATE_MODE = "web"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
-WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/py-k93sys/manifest.json"
+WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/tuxd/manifest.json"
 WEB_TIMEOUT = 8
 
 GITHUB_REPO = ""
@@ -286,7 +286,7 @@ def _fetch_json(url: str, timeout: int):
     sep = '&' if '?' in url else '?'
     url = f"{url}{sep}_={int(time.time())}"
     req = urllib.request.Request(url, headers={
-        "User-Agent": "Py-K93SYS-Updater",
+        "User-Agent": "TuxD-Updater",
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
     })
@@ -444,7 +444,7 @@ def choose_update():
 
 
 def _download_to_file(url: str, dest_path: Path, timeout: int):
-    req = urllib.request.Request(url, headers={"User-Agent": "Py-K93SYS-Updater"})
+    req = urllib.request.Request(url, headers={"User-Agent": "TuxD-Updater"})
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest_path, "wb") as f:
         shutil.copyfileobj(resp, f)
 
@@ -455,7 +455,7 @@ def _extract_tar(tar_path: Path, dest_dir: Path):
 
 
 def _find_release_root(extracted_dir: Path):
-    if (extracted_dir / "modules").exists() or (extracted_dir / "K93SYS.py").exists():
+    if (extracted_dir / "modules").exists() or (extracted_dir / "TuxD.py").exists():
         return extracted_dir
 
     kids = [p for p in extracted_dir.iterdir() if p.is_dir()]
@@ -476,7 +476,6 @@ def _integrity_check_dir_compileall(target_dir: Path) -> bool:
 
 
 def _safe_copy(src: Path, dest: Path) -> None:
-    """Copy src to dest. Falls back to sudo cp + sudo chown on PermissionError."""
     try:
         shutil.copy2(src, dest)
     except PermissionError:
@@ -489,7 +488,6 @@ def _safe_copy(src: Path, dest: Path) -> None:
 
 
 def _safe_mkdir(path: Path) -> None:
-    """Create directory. Falls back to sudo mkdir + sudo chown on PermissionError."""
     try:
         path.mkdir(parents=True, exist_ok=True)
     except PermissionError:
@@ -502,7 +500,6 @@ def _safe_mkdir(path: Path) -> None:
 
 
 def _safe_replace(src: Path, dest: Path) -> None:
-    """Atomically move src to dest. Falls back to sudo mv + sudo chown on PermissionError."""
     try:
         os.replace(src, dest)
     except PermissionError:
@@ -516,7 +513,7 @@ def _safe_replace(src: Path, dest: Path) -> None:
 
 class _Rollback:
     def __init__(self):
-        self.backup_dir = Path(tempfile.mkdtemp(prefix="py-k93sys-backup-"))
+        self.backup_dir = Path(tempfile.mkdtemp(prefix="tuxd-backup-"))
         self.map = {}
         self.created = []
 
@@ -563,7 +560,7 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
     if not (src_root / "modules").exists():
         raise RuntimeError("Release missing 'modules' directory")
 
-    new_launcher = src_root / "K93SYS.py"
+    new_launcher = src_root / "TuxD.py"
     if new_launcher.exists():
         with open(new_launcher, "r", encoding="utf-8-sig", errors="replace") as f:
             ast.parse(f.read(), filename=str(new_launcher))
@@ -577,7 +574,7 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
         _safe_mkdir(dest_root)
 
         for fn in files:
-            if fn in ("config.yaml", "K93SYS.py"):
+            if fn in ("config.yaml", "TuxD.py"):
                 continue
 
             src_file = Path(root) / fn
@@ -598,11 +595,11 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
                 time.sleep(0.33)
 
     if new_launcher.exists():
-        dest_launcher = project_root / "K93SYS.py"
+        dest_launcher = project_root / "TuxD.py"
         if dest_launcher.exists():
             rb.backup_file_if_exists(dest_launcher)
 
-        tmp_launcher = project_root / ".K93SYS.py.tmp"
+        tmp_launcher = project_root / ".TuxD.py.tmp"
         _safe_copy(new_launcher, tmp_launcher)
         _safe_replace(tmp_launcher, dest_launcher)
 
@@ -838,10 +835,10 @@ def _cleanup_terminal():
 
     if _STATUS is not None and _STATUS.enabled:
         try:
-            _STATUS.write(c("Shutting down K93SYS...", YELLOW, BOLD))
+            _STATUS.write(c("Shutting down TuxD...", YELLOW, BOLD))
         except Exception:
             pass
-    log_write("Shutting down K93SYS.")
+    log_write("Shutting down TuxD.")
 
     if _AGENT is not None:
         try:

@@ -273,7 +273,7 @@ class ConfigAgentMixin:
         try:
             if self._terminal_output_enabled():
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
-                self.publish(self.terminal_output_topic, f"{ts}: Restarting Py-K93SYS...")
+                self.publish(self.terminal_output_topic, f"{ts}: Restarting TuxD...")
                 time.sleep(0.5)
             self.set_error(True, "Configuration changed")
         except Exception:
@@ -493,7 +493,7 @@ class ConfigAgentMixin:
         if "self_update_allow_install" in dev:
             add(
                 "self_update_allow_install",
-                "Py-K93SYS Allow Install",
+                "TuxD Allow Install",
                 dev["self_update_allow_install"],
                 {"type": "dict", "keys": ["device", "self_update_allow_install"]},
             )

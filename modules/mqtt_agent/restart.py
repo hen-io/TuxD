@@ -9,13 +9,13 @@ class RestartMixin:
     def register_restart_button(self):
         self._button_discovery(
             "restart_agent",
-            "Restart Py-K93SYS",
+            "Restart TuxD",
             f"{self.base_topic}/restart/set",
             icon="mdi:restart"
         )
         self._button_discovery(
             "refresh_agent",
-            "Refresh Py-K93SYS Entities",
+            "Refresh TuxD Entities",
             f"{self.base_topic}/refresh/set",
             icon="mdi:refresh"
         )
@@ -23,7 +23,7 @@ class RestartMixin:
     def handle_restart_message(self):
         def _restart():
             ts = datetime.datetime.now().strftime("%H:%M:%S")
-            msg = f'{ts}: Button "Restart Py-K93SYS" pressed!'
+            msg = f'{ts}: Button "Restart TuxD" pressed!'
             self.state_cache[self.terminal_output_topic] = msg
             self.client.publish(self.terminal_output_topic, msg)
             if self.tty_output:
@@ -47,7 +47,7 @@ class RestartMixin:
     def handle_refresh_message(self):
         def _refresh():
             ts = datetime.datetime.now().strftime("%H:%M:%S")
-            msg = f'{ts}: Button "Refresh K93SYS Entities" pressed - clearing discovery...'
+            msg = f'{ts}: Button "Refresh TuxD Entities" pressed - clearing discovery...'
             self.state_cache[self.terminal_output_topic] = msg
             self.client.publish(self.terminal_output_topic, msg)
             if self.tty_output:

@@ -1,11 +1,12 @@
-#  █████   ████  ████████   ████████   █████████  █████ █████  █████████
-# ░░███   ███░  ███░░░░███ ███░░░░███ ███░░░░░███░░███ ░░███  ███░░░░░███
-#  ░███  ███   ░███   ░███░░░    ░███░███    ░░░  ░░███ ███  ░███    ░░░
-#  ░███████    ░░█████████   ██████░ ░░█████████   ░░█████   ░░█████████
-#  ░███░░███    ░░░░░░░███  ░░░░░░███ ░░░░░░░░███   ░░███     ░░░░░░░░███
-#  ░███ ░░███   ███   ░███ ███   ░███ ███    ░███    ░███     ███    ░███
-#  █████ ░░████░░████████ ░░████████ ░░█████████     █████   ░░█████████
-# ░░░░░   ░░░░  ░░░░░░░░   ░░░░░░░░   ░░░░░░░░░     ░░░░░     ░░░░░░░░░
+#   $$$$$$$$\                     $$$$$$$\  
+#   \__$$  __|                    $$  __$$\ 
+#      $$ |   $$\   $$\ $$\   $$\ $$ |  $$ |
+#      $$ |   $$ |  $$ |\$$\ $$  |$$ |  $$ |
+#      $$ |   $$ |  $$ | \$$$$  / $$ |  $$ |
+#      $$ |   $$ |  $$ | $$  $$<  $$ |  $$ |
+#      $$ |   \$$$$$$  |$$  /\$$\ $$$$$$$  |
+#      \__|    \______/ \__/  \__|\_______/ 
+
 
 #################################
 # MQTT                          #
@@ -93,7 +94,7 @@ lm_sensors:
   avg_sensor_icon: "mdi:thermometer"
   avg_accuracy_decimals: 1
 
-# Example lm_sensors sensors entry:
+# Example:
 #   sensors:
 #     k10temp-pci-00c3_Tctl_temp1_input:
 #       enabled: true
@@ -132,7 +133,7 @@ docker:
     disk: true
     containers: {}
 
-# Example docker override:
+# Example:
 # docker:
 #   enabled: true
 #   allow_install: true
@@ -168,12 +169,12 @@ host_update:
   allow_install: true
   device_class: ""
 
-# Example host_update override:
+# Example:
 # host_update:
 #   enabled: true
 #   allow_install: true
-#   count_source: "updates_available"   # use commands.status.updates_available as the count
-#   install_button_name: "Update and reboot"  # run the matching button[].command from config.yaml
+#   count_source: "updates_available"
+#   install_button_name: "Update and reboot"
 #   list_cmd: "apt-get -s upgrade | awk '/^Inst /{print $2}'"
 #   install_cmd: "sudo apt-get update && sudo apt-get -y upgrade"
 
@@ -269,7 +270,7 @@ commands:
 
 sensor: []
 
-# Example sensor entry:
+# Example:
 # - name: "System uptime"
 #   cmd: "uptime -p"
 #   update_interval: 60
@@ -283,7 +284,7 @@ sensor: []
 
 logreader: []
 
-# Example log-file sensor entry:
+# Example:
 # - name: "Backup status"
 #   file: "/path/to/status.json"
 #   log_type: json
@@ -307,7 +308,7 @@ logreader: []
 
 select: []
 
-# Example select entry:
+# Example:
 # - name: "Performance Mode"
 #   icon: "mdi:chip"
 #   initial_option: "Powersave"
@@ -330,7 +331,7 @@ select: []
 
 button: []
 
-# Example button entry:
+# Example:
 # - name: "Restart Service"
 #   command: "sudo systemctl restart myservice"
 #   icon: "mdi:restart"
@@ -341,7 +342,7 @@ button: []
 
 tasks: []
 
-# Example task entry:
+# Example:
 # - cmd: "sudo apt update"
 #   update_interval: 3600
 #   write_to_terminal: true
@@ -352,7 +353,7 @@ tasks: []
 
 network: []
 
-# Example network interface entry:
+# Example:
 # - iface: "eth0"
 #   update_interval: 30
 #   accuracy_decimals: 2
@@ -363,7 +364,7 @@ network: []
 
 disk: []
 
-# Example disk entry:
+# Example:
 # - name: "root"
 #   dev: "sda1"
 #   mount: "/"
