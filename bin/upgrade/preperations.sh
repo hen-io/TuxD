@@ -143,6 +143,10 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             break
         fi
     done
+    if [[ -z "$USER_UNIT" && -f "${USER_SERVICE_DIR}/tuxd.service" ]] \
+            && ! grep -q 'start\.py' "${USER_SERVICE_DIR}/tuxd.service"; then
+        USER_UNIT="${USER_SERVICE_DIR}/tuxd.service"
+    fi
 
     SYSTEM_UNIT=""
     for name in py-k93sys k93sys; do
@@ -151,9 +155,13 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             break
         fi
     done
+    if [[ -z "$SYSTEM_UNIT" && -f "/etc/systemd/system/tuxd.service" ]] \
+            && ! sudo grep -q 'start\.py' "/etc/systemd/system/tuxd.service"; then
+        SYSTEM_UNIT="/etc/systemd/system/tuxd.service"
+    fi
 
     if [[ -z "$USER_UNIT" && -z "$SYSTEM_UNIT" ]]; then
-        log "No py-k93sys/k93sys systemd unit found - nothing to convert there."
+        log "No legacy or stale systemd unit found - nothing to convert there."
         trap - ERR
         sudo rm -rf "$BACKUP_ROOT"
         log "Done. TuxD now lives at: ${NEW_DIR}"
@@ -212,13 +220,15 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             sudo cp "$USER_UNIT" "$BACKUP_SERVICE_FILE"
             { echo "scope=user"; echo "name=$(basename "$USER_UNIT" .service)"; } | sudo tee "$BACKUP_SERVICE_META" > /dev/null
 
+            scu stop "$(basename "$USER_UNIT")" 2>/dev/null || true
+            scu disable "$(basename "$USER_UNIT")" 2>/dev/null || true
+            if [[ "$USER_UNIT" != "${USER_SERVICE_DIR}/tuxd.service" ]]; then
+                sudo rm -f "$USER_UNIT"
+            fi
+
             log "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..."
             sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
                 | sudo -u "$TARGET_USER" tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
-
-            scu stop "$(basename "$USER_UNIT")" 2>/dev/null || true
-            scu disable "$(basename "$USER_UNIT")" 2>/dev/null || true
-            sudo rm -f "$USER_UNIT"
 
             scu daemon-reload
             scu enable tuxd.service
@@ -230,13 +240,15 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             sudo cp "$SYSTEM_UNIT" "$BACKUP_SERVICE_FILE"
             { echo "scope=system"; echo "name=$(basename "$SYSTEM_UNIT" .service)"; } | sudo tee "$BACKUP_SERVICE_META" > /dev/null
 
+            sudo systemctl stop "$(basename "$SYSTEM_UNIT")" || true
+            sudo systemctl disable "$(basename "$SYSTEM_UNIT")" || true
+            if [[ "$SYSTEM_UNIT" != "/etc/systemd/system/tuxd.service" ]]; then
+                sudo rm -f "$SYSTEM_UNIT"
+            fi
+
             log "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..."
             sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
                 | sudo tee /etc/systemd/system/tuxd.service > /dev/null
-
-            sudo systemctl stop "$(basename "$SYSTEM_UNIT")" || true
-            sudo systemctl disable "$(basename "$SYSTEM_UNIT")" || true
-            sudo rm -f "$SYSTEM_UNIT"
 
             sudo systemctl daemon-reload
             sudo systemctl enable tuxd.service

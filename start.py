@@ -82,8 +82,8 @@ def _repair_on_cooldown():
     return (time.time() - last) < REPAIR_COOLDOWN_SECONDS
 
 
-def full_repair():
-    if _repair_on_cooldown():
+def full_repair(force=False):
+    if not force and _repair_on_cooldown():
         log("Full repair attempted recently - waiting out the cooldown before trying again.")
         return False
 
@@ -196,4 +196,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--fix" in sys.argv:
+        log("Manual fix requested (--fix): running full repair...")
+        sys.exit(0 if full_repair(force=True) else 1)
+
     sys.exit(main())
