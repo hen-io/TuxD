@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.0"
+VERSION = "2.0.5"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -33,10 +33,11 @@ WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/tuxd/manifest.json"
 WEB_TIMEOUT = 8
 
 GITHUB_REPO = ""
-GITHUB_API_LATEST = "https://api.github.com/repos/{repo}/releases/latest"
 GITHUB_ASSET_SUFFIX = ".tar.gz"
 
 FAILED_UPDATE_RETRY_SECONDS = 3600
+
+EXIT_CONFIG_ERROR = 78
 
 RESET = "\033[0m"
 BOLD = "\033[1m"
@@ -49,6 +50,8 @@ BLUE = "\033[34m"
 CYAN = "\033[36m"
 GRAY = "\033[90m"
 WHITE = "\033[37m"
+BRIGHT_BLUE = "\033[94m"
+BRIGHT_CYAN = "\033[96m"
 
 ESC = "\033["
 
@@ -222,7 +225,7 @@ def print_banner(enabled):
     print("")
     lines += 1
 
-    print(c(div, RED, BOLD))
+    print(c(div, BLUE, BOLD))
     lines += 1
 
     print("")
@@ -230,12 +233,12 @@ def print_banner(enabled):
 
     if show_logo:
         for line in logo_lines:
-            print(c(center_text(line, cols), RED, BOLD))
+            print(c(center_text(line, cols), BRIGHT_BLUE, BOLD))
             lines += 1
 
     print(c(center_text("A lightweight agent to monitor and manage *nix systems via Home Assistant over MQTT.", cols), WHITE, BOLD))
     lines += 1
-    print(c(center_text(f"Version {VERSION}", cols), GRAY, BOLD))
+    print(c(center_text(f"Version {VERSION}", cols), BRIGHT_CYAN, BOLD))
     lines += 1
     print(c(center_text("", cols), YELLOW, BOLD))
     lines += 1
@@ -247,7 +250,7 @@ def print_banner(enabled):
     print("")
     lines += 1
 
-    print(c(div, RED, BOLD))
+    print(c(div, BLUE, BOLD))
     lines += 1
 
     print("")
@@ -261,6 +264,24 @@ def version_tuple(v: str):
     return tuple(int(p) for p in parts) if parts else (0,)
 
 
+def _select_update_target(current_version, available_versions, exclude=None):
+    exclude = exclude or (lambda v: False)
+    pool = [v for v in available_versions if not exclude(v)]
+    if not pool:
+        return None
+
+    cur = version_tuple(current_version)
+    newer = sorted((v for v in pool if version_tuple(v) > cur), key=version_tuple)
+    if newer:
+        return newer[0]
+
+    by_version = sorted(pool, key=version_tuple)
+    latest = by_version[-1]
+    if version_tuple(latest) != cur:
+        return latest
+    return None
+
+
 def find_newer_release_local():
     if not os.path.isdir(RELEASES_DIR):
         return None, None
@@ -270,14 +291,9 @@ def find_newer_release_local():
         if re.match(r'^\d[\d.\-a-zA-Z ]*$', entry):
             releases.append(entry)
 
-    if not releases:
-        return None, None
-
-    releases.sort(key=lambda v: version_tuple(v))
-    latest = releases[-1]
-
-    if version_tuple(latest) != version_tuple(VERSION):
-        return latest, os.path.join(RELEASES_DIR, latest)
+    target = _select_update_target(VERSION, releases, exclude=is_version_recently_failed)
+    if target:
+        return target, os.path.join(RELEASES_DIR, target)
 
     return None, None
 
@@ -304,47 +320,56 @@ def find_newer_release_web():
     except Exception:
         return None, None
 
+    versions = [str(v).strip() for v in (manifest.get("versions") or []) if str(v).strip()]
     latest = str(manifest.get("latest", "")).strip()
-    download_url = str(manifest.get("download_url", "")).strip()
+    if latest and latest.replace(".", "").isdigit() and latest not in versions:
+        versions.append(latest)
 
-    if not latest or not download_url:
+    versions = [v for v in versions if v.replace(".", "").isdigit()]
+    if not versions:
         return None, None
-    if not latest.replace(".", "").isdigit():
+
+    target = _select_update_target(VERSION, versions, exclude=is_version_recently_failed)
+    if not target:
         return None, None
 
-    if version_tuple(latest) != version_tuple(VERSION):
-        return latest, download_url
+    if target == latest:
+        download_url = str(manifest.get("download_url", "")).strip()
+        if download_url:
+            return target, download_url
 
-    return None, None
+    base = WEB_MANIFEST_URL.rsplit("/", 1)[0]
+    return target, f"{base}/releases/{target}.tar.gz"
 
 
 def find_newer_release_github():
     if not GITHUB_REPO:
         return None, None
 
-    url = GITHUB_API_LATEST.format(repo=GITHUB_REPO)
+    url = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
     try:
-        manifest = _fetch_json(url, timeout=WEB_TIMEOUT)
+        releases = _fetch_json(url, timeout=WEB_TIMEOUT)
     except Exception:
         return None, None
 
-    tag = str(manifest.get("tag_name", "")).strip()
-    latest = tag[1:] if tag[:1] in ("v", "V") else tag
-    if not latest or not latest.replace(".", "").isdigit():
+    if not isinstance(releases, list):
         return None, None
 
-    download_url = ""
-    for asset in manifest.get("assets") or []:
-        name = str(asset.get("name", ""))
-        if name.endswith(GITHUB_ASSET_SUFFIX):
-            download_url = str(asset.get("browser_download_url", "")).strip()
-            break
+    by_version = {}
+    for rel in releases:
+        tag = str(rel.get("tag_name", "")).strip()
+        v = tag[1:] if tag[:1] in ("v", "V") else tag
+        if not v or not v.replace(".", "").isdigit():
+            continue
+        for asset in rel.get("assets") or []:
+            name = str(asset.get("name", ""))
+            if name.endswith(GITHUB_ASSET_SUFFIX):
+                by_version[v] = str(asset.get("browser_download_url", "")).strip()
+                break
 
-    if not download_url:
-        return None, None
-
-    if version_tuple(latest) != version_tuple(VERSION):
-        return latest, download_url
+    target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed)
+    if target and by_version.get(target):
+        return target, by_version[target]
 
     return None, None
 
@@ -483,7 +508,10 @@ def _download_to_file(url: str, dest_path: Path, timeout: int):
 
 def _extract_tar(tar_path: Path, dest_dir: Path):
     with tarfile.open(tar_path, "r:gz") as t:
-        t.extractall(dest_dir)
+        try:
+            t.extractall(dest_dir, filter="data")
+        except TypeError:
+            t.extractall(dest_dir)
 
 
 def _find_release_root(extracted_dir: Path):
@@ -750,6 +778,13 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
         time.sleep(2)
         os.execv(sys.executable, [sys.executable] + restart_argv)
 
+    self_path = Path(restart_argv[0]) if restart_argv else None
+    if self_path is not None:
+        if not self_path.is_absolute():
+            self_path = Path.cwd() / self_path
+        if not self_path.exists():
+            sys.exit(0)
+
     os.execv(sys.executable, [sys.executable] + restart_argv)
 
 
@@ -836,6 +871,65 @@ def mqtt_broker_ok(cfg, timeout=5):
         pass
 
     return bool(state["ok"])
+
+
+def _publish_emergency_error(cfg, reason):
+    try:
+        import paho.mqtt.client as mqtt
+
+        mqtt_cfg = (cfg or {}).get("mqtt", {}) or {}
+        device_cfg = (cfg or {}).get("device", {}) or {}
+        device_name = device_cfg.get("name")
+        broker = mqtt_cfg.get("broker")
+        if not device_name or not broker:
+            return
+
+        port = int(mqtt_cfg.get("port", 1883))
+        base_topic = f"TuxD{device_name}"
+        device_info = {
+            "identifiers": [device_name],
+            "name": device_name,
+            "manufacturer": "Henrik Isefjær Olsen",
+            "model": f"TuxD Linux Agent Version {VERSION}",
+            "sw_version": VERSION,
+        }
+
+        try:
+            client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+        except Exception:
+            client = mqtt.Client()
+
+        if mqtt_cfg.get("username") is not None:
+            client.username_pw_set(mqtt_cfg.get("username"), mqtt_cfg.get("password"))
+
+        client.connect(broker, port, 10)
+        client.loop_start()
+        time.sleep(0.5)
+
+        discovery_payload = {
+            "name": "Error",
+            "state_topic": f"{base_topic}/error",
+            "unique_id": f"{device_name}_system_error",
+            "device": device_info,
+            "payload_on": "ON",
+            "payload_off": "OFF",
+            "device_class": "problem",
+            "icon": "mdi:alert-circle",
+            "json_attributes_topic": f"{base_topic}/error_attributes",
+            "entity_category": "diagnostic",
+        }
+        client.publish(
+            f"homeassistant/binary_sensor/{device_name}/system_error/config",
+            json.dumps(discovery_payload), retain=True,
+        )
+        client.publish(f"{base_topic}/error", "ON", retain=True)
+        client.publish(f"{base_topic}/error_attributes", json.dumps({"reason": reason}), retain=True)
+        time.sleep(0.5)
+
+        client.loop_stop()
+        client.disconnect()
+    except Exception:
+        pass
 
 
 def restart_in(seconds=10):
@@ -1098,7 +1192,7 @@ def main():
         cfg = yaml.safe_load(Path(CONFIG_PATH).read_text(encoding="utf-8"))
     except Exception:
         print(c("Failed to load configuration!", RED, BOLD))
-        sys.exit(1)
+        sys.exit(EXIT_CONFIG_ERROR)
 
     device_cfg = (cfg or {}).get("device", {}) or {}
     tty_output = bool(device_cfg.get("tty_output", False))
@@ -1196,6 +1290,7 @@ def main():
                 status.write(c(f"Import error: {e}", RED, BOLD))
                 time.sleep(5)
             log_write(f"Import error: {repr(e)}")
+            _publish_emergency_error(cfg, f"Startup failed: import error - {e}")
             sys.exit(1)
 
         if enabled:
@@ -1203,7 +1298,7 @@ def main():
             time.sleep(.25)
 
             cols = get_term_cols(80)
-            divider_row = status.set_divider(c(make_divider(cols, "="), RED, BOLD))
+            divider_row = status.set_divider(c(make_divider(cols, "="), BLUE, BOLD))
 
             height = get_term_lines(24)
             scroll_top = divider_row + 1
@@ -1218,12 +1313,20 @@ def main():
         first_start = True
 
         while True:
-            agent = HAMQTTAgent(
-                cfg, VERSION, log_file=_LOG_FILE, log_level=log_level,
-                update_status=_read_update_status(),
-                update_checker=choose_update,
-                update_applier=lambda nv, st, sv: safe_apply_update_any(nv, st, sv, enabled=False),
-            )
+            try:
+                agent = HAMQTTAgent(
+                    cfg, VERSION, log_file=_LOG_FILE, log_level=log_level,
+                    update_status=_read_update_status(),
+                    update_checker=choose_update,
+                    update_applier=lambda nv, st, sv: safe_apply_update_any(nv, st, sv, enabled=False),
+                )
+            except Exception as e:
+                if enabled:
+                    status.write(c(f"Agent init failed: {e}", RED, BOLD))
+                    time.sleep(5)
+                log_write(f"Agent init failed: {repr(e)}")
+                _publish_emergency_error(cfg, f"Startup failed: {e}")
+                sys.exit(EXIT_CONFIG_ERROR)
             _AGENT = agent
 
             def _on_agent_ready():

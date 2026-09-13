@@ -124,7 +124,7 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
         NEW_DIR="$PROJECT_DIR"
     elif [[ -e "$NEW_DIR" ]]; then
         log_err "ERROR: ${NEW_DIR} already exists, refusing to overwrite it."
-        exit 1
+        false
     else
         log "Renaming ${PROJECT_DIR} -> ${NEW_DIR}..."
         sudo mv "$PROJECT_DIR" "$NEW_DIR"
@@ -201,17 +201,20 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             sudo systemctl daemon-reload
         fi
 
+        TEMPLATE_UNIT="${NEW_DIR}/bin/upgrade/tuxd.service"
+
+        if [[ ! -f "$TEMPLATE_UNIT" ]]; then
+            log_err "ERROR: template unit not found at ${TEMPLATE_UNIT}."
+            false
+        fi
 
         if [[ "$CONVERT_USER" -eq 1 ]]; then
             sudo cp "$USER_UNIT" "$BACKUP_SERVICE_FILE"
             { echo "scope=user"; echo "name=$(basename "$USER_UNIT" .service)"; } | sudo tee "$BACKUP_SERVICE_META" > /dev/null
 
-            log "Converting ${USER_UNIT} -> ${USER_SERVICE_DIR}/tuxd.service..."
-            sed \
-                -e "s/py-k93sys/TuxD/gI" \
-                -e "s/k93sys/TuxD/gI" \
-                -e "s/K93SYS\.py/TuxD.py/g" \
-                "$USER_UNIT" | sudo -u "$TARGET_USER" tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
+            log "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..."
+            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
+                | sudo -u "$TARGET_USER" tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
 
             scu stop "$(basename "$USER_UNIT")" 2>/dev/null || true
             scu disable "$(basename "$USER_UNIT")" 2>/dev/null || true
@@ -227,12 +230,9 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             sudo cp "$SYSTEM_UNIT" "$BACKUP_SERVICE_FILE"
             { echo "scope=system"; echo "name=$(basename "$SYSTEM_UNIT" .service)"; } | sudo tee "$BACKUP_SERVICE_META" > /dev/null
 
-            log "Converting ${SYSTEM_UNIT} -> /etc/systemd/system/tuxd.service..."
-            sudo sed \
-                -e "s/py-k93sys/TuxD/gI" \
-                -e "s/k93sys/TuxD/gI" \
-                -e "s/K93SYS\.py/TuxD.py/g" \
-                "$SYSTEM_UNIT" | sudo tee /etc/systemd/system/tuxd.service > /dev/null
+            log "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..."
+            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
+                | sudo tee /etc/systemd/system/tuxd.service > /dev/null
 
             sudo systemctl stop "$(basename "$SYSTEM_UNIT")" || true
             sudo systemctl disable "$(basename "$SYSTEM_UNIT")" || true
