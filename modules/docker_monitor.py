@@ -266,19 +266,6 @@ def local_image_digest(repo_digests, image_ref):
 
 
 def remote_image_digest(image_ref, docker_bin="docker"):
-
-
-
-
-
-
-
-
-
-
-
-
-
     ref = str(image_ref or "").strip()
     if not ref or not shutil.which("skopeo"):
         return None

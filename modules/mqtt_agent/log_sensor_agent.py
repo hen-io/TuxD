@@ -77,7 +77,6 @@ def _read_last_line(path, log_type="json"):
 class LogSensorMixin:
     def init_log_sensors(self):
         self.log_sensors = self.config.get("logreader", []) or []
-
         self._log_hits = {}
         self._last_log_value = {}
         self._hits_lock = threading.Lock()
@@ -91,7 +90,6 @@ class LogSensorMixin:
 
             for s in self.log_sensors:
                 slug = s["name"].replace(" ", "_").lower()
-
                 has_today = (
                     s.get("log_hits_sensor_today") == "enabled"
                     or s.get("log_hits_sensor") == "enabled"
@@ -105,15 +103,12 @@ class LogSensorMixin:
                 has_any = True
                 entry = stored.get(slug, {})
 
-
                 last_reset  = entry.get("last_reset") or time.time()
                 count_today = entry.get("count_today", 0)
-
 
                 if last_reset < midnight_today:
                     count_today = 0
                     last_reset  = time.time()
-
 
                 cutoff_1h = time.time() - _1H
                 timestamps = deque(
@@ -132,10 +127,8 @@ class LogSensorMixin:
                 self._last_log_value[slug] = entry.get("last_value", "")
 
             data["last_start"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
             data["logreader_hits"] = self._hits_to_db_dict()
             self._db_write(data)
-
 
 
     def _db_read(self):
@@ -177,7 +170,6 @@ class LogSensorMixin:
         self._db_write(data)
 
 
-
     def _do_midnight_reset(self):
         now = time.time()
         with self._hits_lock:
@@ -198,7 +190,6 @@ class LogSensorMixin:
         return last_midnight
 
 
-
     def _prune_rolling_windows(self):
         now = time.time()
         cutoff_1h  = now - _1H
@@ -213,7 +204,6 @@ class LogSensorMixin:
                 h["timestamps"].popleft()
             if len(h["timestamps"]) != old_len:
                 changed = True
-
             if h["has_1h"]:
                 self.publish(
                     f"{self.base_topic}/log_sensor/{slug}_hits_1h",
@@ -229,7 +219,6 @@ class LogSensorMixin:
         if changed:
             with self._hits_lock:
                 self._hits_db_save()
-
 
 
     def register_log_sensors(self):
@@ -283,7 +272,6 @@ class LogSensorMixin:
                     state_class="measurement",
                 )
             self._publish_hits(slug)
-
 
 
     def _json_extract(self, result, json_value):
@@ -358,7 +346,6 @@ class LogSensorMixin:
             self._hits_db_save()
 
         self._publish_hits(slug)
-
 
 
     def log_sensor_loop(self):
@@ -460,8 +447,6 @@ class LogSensorMixin:
                             time.sleep(read_delay)
                         result, err = _read_last_line(path, log_type)
                         if result is not None:
-
-
                             ck = json.dumps(result, sort_keys=True) if isinstance(result, dict) else str(result)
                             prev = last_content.get(path)
                             now_ts = time.time()

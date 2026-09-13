@@ -44,7 +44,6 @@ def _parse_conf_vars(text: str) -> tuple:
         raw = lines[i].rstrip('\n').rstrip('\r')
         stripped = raw.strip()
 
-
         if stripped == _SEP_BAR and i + 2 < n:
             title_raw = lines[i + 1].rstrip('\n').rstrip('\r').strip()
             third_raw = lines[i + 2].rstrip('\n').rstrip('\r').strip()
@@ -53,12 +52,10 @@ def _parse_conf_vars(text: str) -> tuple:
                 i += 3
                 continue
 
-
         if pending_title is not None and raw and not raw[0].isspace() and not raw.startswith('#'):
             current_key = raw.split(':')[0].strip()
             section_labels[current_key] = pending_title
             pending_title = None
-
 
         if current_key is not None and raw.startswith('# Example'):
             sample_lines = []

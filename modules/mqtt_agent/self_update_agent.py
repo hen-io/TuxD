@@ -25,14 +25,6 @@ class SelfUpdateMixin:
             ha_object_id=f"{self.device_slug}_tuxd",
         )
 
-
-
-
-
-
-
-
-
         if not self._self_update_installing and self._self_update_last_state is None:
             self.publish(
                 f"{base}/state",

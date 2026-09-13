@@ -60,9 +60,6 @@ class DockerMixin:
         cfg = self.config.get("docker", {}) or {}
         active = bool(cfg.get("enabled", False)) and self._docker_has_compose_file()
 
-
-
-
         self._binary_sensor_discovery(
             "docker_enabled",
             cfg.get("enabled_sensor_name", "Docker monitoring enabled"),
@@ -134,10 +131,6 @@ class DockerMixin:
             entity_category="diagnostic",
             ha_object_id=f"{self.device_slug}_container_{slug}",
         )
-
-
-
-
 
         if slug not in self._docker_installing:
             self._set_docker_image_progress(f"{self.base_topic}/docker", slug, False)
@@ -224,11 +217,6 @@ class DockerMixin:
 
             now = time.time()
             if now - self._docker_last_image_check >= image_interval:
-
-
-
-
-
                 found = False
                 try:
                     found = self._docker_check_images(merged_conts, docker_bin, base)
@@ -386,10 +374,6 @@ class DockerMixin:
             remote = remote_image_digest(ref, docker_bin)
 
             if local and remote and local != remote:
-
-
-
-
                 remote = remote_image_digest(ref, docker_bin) or remote
 
             self._publish_docker_image_state(base, slug, ref, local, remote)

@@ -73,11 +73,6 @@ class HAMQTTAgent(
         self.init_system_status()
 
     def refresh_discovery(self):
-
-
-
-
-
         registrars = (
             self.init_terminal,
             self.register_restart_button,
@@ -166,12 +161,6 @@ class HAMQTTAgent(
         self.connect()
 
         self.refresh_discovery()
-
-
-
-
-
-
 
         settle = float((self.config.get("device") or {}).get("discovery_settle_delay", 2.0))
         if settle > 0:

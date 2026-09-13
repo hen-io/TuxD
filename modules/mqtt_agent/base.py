@@ -8,10 +8,6 @@ import paho.mqtt.client as mqtt
 
 
 def slugify(s):
-
-
-
-
     s = re.sub(r"[^a-z0-9]+", "_", str(s).lower())
     return s.strip("_")
 
@@ -128,16 +124,6 @@ class HAMQTTBase:
             time.sleep(0.5)
 
     def publish(self, topic, payload, retain=True):
-
-
-
-
-
-
-
-
-
-
         if not isinstance(payload, str):
             payload = str(payload)
 

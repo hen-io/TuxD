@@ -53,17 +53,6 @@ class HostUpdateMixin:
             ha_object_id=f"{self.device_slug}_new_package_version_available",
         )
 
-
-
-
-
-
-
-
-
-
-
-
         if not self._host_update_installing and self._host_update_last_state is None:
             self.publish(
                 f"{base}/state",
@@ -211,12 +200,6 @@ class HostUpdateMixin:
                         self.publish(self.terminal_output_topic, line)
         except Exception:
             pass
-
-
-
-
-
-
 
         try:
             if self._terminal_output_enabled():
