@@ -25,14 +25,14 @@ CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
 LOG_FILE_PATH = "tuxd.log"
 
-UPDATE_MODE = "web"
+UPDATE_MODE = "git"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
 WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/tuxd/manifest.json"
 WEB_TIMEOUT = 8
 
-GITHUB_REPO = ""
+GITHUB_REPO = "hen-io/TuxD"
 GITHUB_ASSET_SUFFIX = ".tar.gz"
 
 FAILED_UPDATE_RETRY_SECONDS = 3600
@@ -361,11 +361,19 @@ def find_newer_release_github():
         v = tag[1:] if tag[:1] in ("v", "V") else tag
         if not v or not v.replace(".", "").isdigit():
             continue
+
+        download_url = ""
         for asset in rel.get("assets") or []:
             name = str(asset.get("name", ""))
             if name.endswith(GITHUB_ASSET_SUFFIX):
-                by_version[v] = str(asset.get("browser_download_url", "")).strip()
+                download_url = str(asset.get("browser_download_url", "")).strip()
                 break
+
+        if not download_url:
+            download_url = str(rel.get("tarball_url", "")).strip()
+
+        if download_url:
+            by_version[v] = download_url
 
     target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed)
     if target and by_version.get(target):
@@ -403,6 +411,8 @@ def find_release_by_version(target_version: str):
                 if name.endswith(GITHUB_ASSET_SUFFIX):
                     download_url = str(asset.get("browser_download_url", "")).strip()
                     break
+            if not download_url:
+                download_url = str(manifest.get("tarball_url", "")).strip()
             if download_url:
                 return target_version, "web", download_url
 
