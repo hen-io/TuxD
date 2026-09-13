@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.8"
+VERSION = "2.0.9"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
