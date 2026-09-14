@@ -19,13 +19,13 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.24"
+VERSION = "2.0.26"
 
 CONFIG_PATH = "config.yaml"
-RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
+RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
 LOG_FILE_PATH = "tuxd.log"
 
-UPDATE_MODE = "web"
+UPDATE_MODE = "github"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
