@@ -8,8 +8,8 @@
 ```
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="banner-logo.png">
-    <img src="bin/logo.png" alt="K93 ANS" height="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="bin/logo.png">
+    <img src="bin/logo.png" alt="TuxD" height="300em">
   </picture>
 </p>
 
