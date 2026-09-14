@@ -5,9 +5,11 @@
  / / / /_/ //   |/ /_/ / 
 /_/  \____//_/|_/_____/  
                          
-```
+![Alt text]([image-url-or-path](https://github.com/hen-io/TuxD/blob/main/bin/upgrade/logo.png))```
 
 ### A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.
+
+
 
 ### This readme is very much a WIP...
 
