@@ -6,7 +6,12 @@
 /_/  \____//_/|_/_____/  
                          
 ```
-![Logo]([image-url-or-path](https://github.com/hen-io/TuxD/blob/main/bin/upgrade/logo.png))
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="banner-logo.png">
+    <img src="bin/logo.png" alt="K93 ANS" height="100%">
+  </picture>
+</p>
 
 ### A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.
 
