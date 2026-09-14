@@ -90,6 +90,16 @@ install_user_unit() {
     log "$2"
 }
 
+if [[ "$OLD_DIR_NAME" == "TuxD" && "$FORCE_SYSTEM" -eq 0 && "$FORCE_USER" -eq 0 ]]; then
+    ALREADY_HAS_UNIT=0
+    [[ -f "${USER_SERVICE_DIR}/tuxd.service" ]] && grep -q 'start\.py' "${USER_SERVICE_DIR}/tuxd.service" && ALREADY_HAS_UNIT=1
+    [[ -f "/etc/systemd/system/tuxd.service" ]] && $SUDO grep -q 'start\.py' "/etc/systemd/system/tuxd.service" && ALREADY_HAS_UNIT=1
+    if [[ "$ALREADY_HAS_UNIT" -eq 1 ]]; then
+        log "Already named TuxD with a current tuxd.service - nothing to do."
+        exit 0
+    fi
+fi
+
 
 if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_DIR_NAME,,}" == "k93sys" ]]; then
 
