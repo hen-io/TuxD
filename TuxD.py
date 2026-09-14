@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.41"
+VERSION = "2.0.42"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -397,7 +397,8 @@ def find_newer_release_github(prefer_latest=False):
     url = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
     try:
         releases = _fetch_json(url, timeout=WEB_TIMEOUT)
-    except Exception:
+    except Exception as e:
+        log_write(f"GitHub update check failed ({url}): {e}")
         return None, None
 
     if not isinstance(releases, list):
@@ -717,8 +718,8 @@ def _run_upgrade_hook(project_root: Path, enabled: bool):
         else:
             cmd = ["systemd-run", "--user", f"--unit={unit}", "--collect", "bash", str(hook)]
         subprocess.run(cmd, cwd=str(project_root), timeout=60)
-    except Exception:
-        pass
+    except Exception as e:
+        log_write(f"Upgrade hook failed to launch ({hook}): {e!r}")
 
 
 def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
@@ -773,6 +774,7 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
     except Exception as e:
         mark_version_failed(str(new_version))
         _write_update_status("Update failed")
+        log_write(f"Update to {new_version} FAILED ({source_type} from {source_value}): {e!r} - rolling back.")
 
         if enabled:
             print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
@@ -1108,8 +1110,8 @@ def _migrate_legacy_config_name():
     if new_path.exists() or not old_path.exists():
         return
     try:
-        os.rename(str(old_path), str(new_path))
-        log_write(f"Migrated legacy {old_path} -> {new_path}.")
+        shutil.copy2(str(old_path), str(new_path))
+        log_write(f"Migrated legacy {old_path} -> {new_path} (original kept as a backup).")
     except Exception as e:
         log_write(f"Failed to migrate {old_path} -> {new_path}: {e}")
         return
@@ -1118,7 +1120,7 @@ def _migrate_legacy_config_name():
     new_ksync = new_path.with_suffix(".ksync")
     if old_ksync.exists() and not new_ksync.exists():
         try:
-            os.rename(str(old_ksync), str(new_ksync))
+            shutil.copy2(str(old_ksync), str(new_ksync))
         except Exception as e:
             log_write(f"Failed to migrate {old_ksync} -> {new_ksync}: {e}")
 
