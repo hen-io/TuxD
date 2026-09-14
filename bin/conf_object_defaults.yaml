@@ -1,0 +1,25 @@
+select:
+  write_to_terminal: true
+
+tasks:
+  update_interval: 3600
+  write_to_terminal: true
+  log_on_run: true
+
+button:
+  write_to_terminal: true
+
+sensor:
+  update_interval: 10
+
+network:
+  update_interval: 5
+  accuracy_decimals: 2
+
+disk:
+  update_interval: 10
+  smart_enabled: true
+  accuracy_decimals: 2
+
+logreader:
+  log_type: json

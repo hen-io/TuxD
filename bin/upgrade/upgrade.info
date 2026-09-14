@@ -1,0 +1,11 @@
+# Set extra_deps=true for a release that needs new system dependencies (a
+# new pip/apt package, etc.) installed before it can run cleanly. When true,
+# update discovery skips step-by-step progression and jumps straight to
+# whatever the actual latest release is instead - stepping through further
+# intermediate releases one at a time is more likely to land on a
+# half-upgraded host than just going straight to the newest.
+#
+# Only affects the CURRENTLY running release - reset to false (or remove
+# the line) for the next release once its own dependencies are handled, or
+# leave it here as a template with no effect.
+extra_deps=false
