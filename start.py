@@ -16,12 +16,8 @@ from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent
 LOG_FILE = PROJECT_DIR / "upgrade.log"
-FAIL_COUNT_FILE = PROJECT_DIR / ".start_fail_count"
-BACKUP_DIR = PROJECT_DIR / ".update_backup"
 REPAIR_COOLDOWN_FILE = PROJECT_DIR / ".last_repair_attempt"
 CONFIG_ERROR_EXIT = 78
-FAST_FAIL_SECONDS = 30
-ROLLBACK_AFTER_FAILS = 2
 REPAIR_COOLDOWN_SECONDS = 600
 
 
@@ -78,38 +74,6 @@ class _Spinner:
         return False
 
 
-def read_fail_count():
-    try:
-        return int(FAIL_COUNT_FILE.read_text().strip())
-    except Exception:
-        return 0
-
-
-def write_fail_count(n):
-    try:
-        FAIL_COUNT_FILE.write_text(str(n))
-    except Exception:
-        pass
-
-
-def clear_fail_count():
-    try:
-        FAIL_COUNT_FILE.unlink()
-    except Exception:
-        pass
-
-
-def restore_backup():
-    if not BACKUP_DIR.is_dir():
-        return False
-    log(f"Downgrading: restoring pre-update backup from {BACKUP_DIR}...")
-    helper = PROJECT_DIR / "bin" / "upgrade" / "restore_backup.py"
-    with _Spinner("Restoring previous version"):
-        subprocess.run([sys.executable, str(helper), str(BACKUP_DIR)])
-    log("Backup restored.")
-    return True
-
-
 def _read_github_repo():
     try:
         text = (PROJECT_DIR / "TuxD.py").read_text(encoding="utf-8", errors="replace")
@@ -127,9 +91,27 @@ def _repair_on_cooldown():
     return (time.time() - last) < REPAIR_COOLDOWN_SECONDS
 
 
-def full_repair(force=False):
+def _find_release(repo, version=None):
+    if version:
+        for tag in (f"v{version}", version):
+            api_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
+            try:
+                req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
+                with urllib.request.urlopen(req, timeout=15) as resp:
+                    return json.loads(resp.read().decode("utf-8-sig", errors="replace"))
+            except Exception:
+                continue
+        return None
+
+    api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+    req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode("utf-8-sig", errors="replace"))
+
+
+def full_repair(version=None, force=False):
     if not force and _repair_on_cooldown():
-        log("Full repair attempted recently - waiting out the cooldown before trying again.")
+        log("Repair attempted recently - waiting out the cooldown before trying again.")
         return False
 
     try:
@@ -139,18 +121,18 @@ def full_repair(force=False):
 
     repo = _read_github_repo()
     if not repo:
-        log("Full repair: could not find GITHUB_REPO in TuxD.py - skipping.")
+        log("Repair: could not find GITHUB_REPO in TuxD.py - skipping.")
         return False
 
     try:
-        api_url = f"https://api.github.com/repos/{repo}/releases/latest"
-        req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            release = json.loads(resp.read().decode("utf-8-sig", errors="replace"))
+        release = _find_release(repo, version)
+        if not release:
+            log(f"Repair: {'version ' + version if version else 'latest release'} not found on GitHub - skipping.")
+            return False
 
-        version = str(release.get("tag_name", "")).strip()
-        if version[:1] in ("v", "V"):
-            version = version[1:]
+        found_version = str(release.get("tag_name", "")).strip()
+        if found_version[:1] in ("v", "V"):
+            found_version = found_version[1:]
 
         download_url = ""
         for asset in release.get("assets") or []:
@@ -162,16 +144,16 @@ def full_repair(force=False):
             download_url = str(release.get("tarball_url", "")).strip()
 
         if not download_url:
-            log("Full repair: release has no usable download - skipping.")
+            log("Repair: release has no usable download - skipping.")
             return False
 
-        log(f"Repairing: downloading {version or 'latest'} via github from {download_url}")
+        log(f"Repairing: downloading {found_version or version or 'latest'} via github from {download_url}")
 
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             tar_path = td_path / "release.tar.gz"
             req = urllib.request.Request(download_url, headers={"User-Agent": "TuxD-Updater"})
-            with _Spinner(f"Downloading {version or 'latest'} (github)"):
+            with _Spinner(f"Downloading {found_version or version or 'latest'} (github)"):
                 with urllib.request.urlopen(req, timeout=60) as resp, open(tar_path, "wb") as f:
                     shutil.copyfileobj(resp, f)
 
@@ -191,7 +173,7 @@ def full_repair(force=False):
                     release_root = kids[0]
 
             if not (release_root / "modules").exists():
-                log("Full repair: downloaded release doesn't look valid (no modules/) - aborting.")
+                log("Repair: downloaded release doesn't look valid (no modules/) - aborting.")
                 return False
 
             with _Spinner("Installing files"):
@@ -204,10 +186,10 @@ def full_repair(force=False):
                             continue
                         shutil.copy2(Path(root) / fn, dest_root / fn)
 
-        log(f"Full repair complete - {version or 'latest'} installed fresh via github (config.yaml untouched).")
+        log(f"Repair complete - {found_version or version or 'latest'} installed (config.yaml untouched).")
         return True
     except Exception as e:
-        log(f"Full repair failed: {e}")
+        log(f"Repair failed: {e}")
         return False
 
 
@@ -215,10 +197,8 @@ def main():
     tuxd_py = PROJECT_DIR / "TuxD.py"
 
     while True:
-        start_time = time.time()
         result = subprocess.run([sys.executable, str(tuxd_py)] + sys.argv[1:])
         exit_code = result.returncode
-        ran_for = time.time() - start_time
 
         if exit_code == 0:
             log("TuxD.py exited cleanly.")
@@ -226,41 +206,19 @@ def main():
 
         if exit_code == CONFIG_ERROR_EXIT:
             log(f"TuxD.py reported a configuration error (exit {CONFIG_ERROR_EXIT}) - "
-                f"fix config.yaml. Not touching the install; retrying in 60s.")
-            clear_fail_count()
+                f"fix config.yaml. Retrying in 60s.")
             time.sleep(60)
             continue
 
-        if ran_for >= FAST_FAIL_SECONDS:
-            clear_fail_count()
-            log(f"TuxD.py exited (code {exit_code}) after running for {int(ran_for)}s - "
-                f"not treated as a startup crash. Restarting.")
-            time.sleep(5)
-            continue
-
-        fails = read_fail_count() + 1
-        write_fail_count(fails)
-        log(f"TuxD.py failed fast (code {exit_code}, ran {int(ran_for)}s) - "
-            f"consecutive fast failures: {fails}")
-
-        if fails >= ROLLBACK_AFTER_FAILS:
-            if restore_backup():
-                clear_fail_count()
-                time.sleep(2)
-                continue
-            log("No pending update backup to restore - trying a full repair instead.")
-            if full_repair():
-                clear_fail_count()
-                time.sleep(2)
-                continue
-            log("Full repair unavailable or failed - letting it keep retrying.")
-
+        log(f"TuxD.py exited (code {exit_code}). Restarting in 5s.")
         time.sleep(5)
 
 
 if __name__ == "__main__":
     if "--fix" in sys.argv:
-        log("Manual fix requested (--fix): running full repair...")
-        sys.exit(0 if full_repair(force=True) else 1)
+        idx = sys.argv.index("--fix")
+        target_version = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else None
+        log(f"Manual fix requested (--fix{' ' + target_version if target_version else ''})...")
+        sys.exit(0 if full_repair(version=target_version, force=True) else 1)
 
     sys.exit(main())

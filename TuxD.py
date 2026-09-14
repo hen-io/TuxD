@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.17"
+VERSION = "2.0.18"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -410,43 +410,6 @@ def find_newer_release_github(prefer_latest=False):
     return None, None
 
 
-def find_release_by_version(target_version: str):
-    mode = _normalize_update_mode(UPDATE_MODE)
-    target = version_tuple(target_version)
-
-    if mode in ("local", "both", "all") and os.path.isdir(RELEASES_DIR):
-        candidate = os.path.join(RELEASES_DIR, target_version)
-        if os.path.isdir(candidate):
-            return target_version, "local", candidate
-        for entry in os.listdir(RELEASES_DIR):
-            if version_tuple(entry) == target:
-                return entry, "local", os.path.join(RELEASES_DIR, entry)
-
-    if mode in ("web", "both", "all") and WEB_MANIFEST_URL:
-        base = WEB_MANIFEST_URL.rsplit("/", 1)[0]
-        return target_version, "web", f"{base}/releases/{target_version}.tar.gz"
-
-    if mode in ("github", "all") and GITHUB_REPO:
-        for tag in (f"v{target_version}", target_version):
-            api_url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/tags/{tag}"
-            try:
-                manifest = _fetch_json(api_url, timeout=WEB_TIMEOUT)
-            except Exception:
-                continue
-            download_url = ""
-            for asset in manifest.get("assets") or []:
-                name = str(asset.get("name", ""))
-                if name.endswith(GITHUB_ASSET_SUFFIX):
-                    download_url = str(asset.get("browser_download_url", "")).strip()
-                    break
-            if not download_url:
-                download_url = str(manifest.get("tarball_url", "")).strip()
-            if download_url:
-                return target_version, "web", download_url
-
-    return None, None, None
-
-
 _DB_FILE = "database.json"
 
 
@@ -631,15 +594,6 @@ class _Rollback:
     def mark_created(self, dest: Path):
         self.created.append(str(dest))
 
-    def save_manifest(self):
-        try:
-            manifest = {"map": self.map, "created": self.created}
-            (self.backup_dir / "manifest.json").write_text(
-                json.dumps(manifest), encoding="utf-8"
-            )
-        except Exception:
-            pass
-
     def restore(self):
         for p in self.created:
             try:
@@ -742,25 +696,15 @@ def _run_upgrade_hook(project_root: Path, enabled: bool):
         pass
 
 
-def safe_apply_update_any(new_version, source_type, source_value, enabled=True, restart_argv=None):
+def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
     project_root = Path(__file__).resolve().parent
-    restart_argv = list(restart_argv) if restart_argv is not None else list(sys.argv)
-
-    backup_dir = project_root / ".update_backup"
-    if backup_dir.exists():
-        shutil.rmtree(backup_dir, ignore_errors=True)
-    rb = _Rollback(backup_dir=backup_dir)
+    rb = _Rollback()
 
     try:
         if enabled:
             print(c(f"Installing version {new_version}...", YELLOW, BOLD))
             print("")
         time.sleep(1)
-
-        diag = f"safe_apply_update_any: version={new_version} source_type={source_type} source_value={source_value}"
-        if enabled:
-            print(c(diag, DIM))
-        log_write(diag)
 
         if source_type == "local":
             _apply_update_from_dir(Path(source_value), enabled, rb)
@@ -776,10 +720,6 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
                 _extract_tar(tar_path, extract_dir)
 
                 release_root = _find_release_root(extract_dir)
-                diag = f"_find_release_root: extract_dir contents={sorted(p.name for p in extract_dir.iterdir())} -> release_root={release_root}"
-                if enabled:
-                    print(c(diag, DIM))
-                log_write(diag)
                 _apply_update_from_dir(release_root, enabled, rb)
 
         else:
@@ -797,12 +737,6 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
         clear_version_failed(new_version)
 
         _run_upgrade_hook(project_root, enabled)
-
-        rb.save_manifest()
-        _db = _db_read()
-        _db["pending_update_backup"] = str(rb.backup_dir)
-        _db["pending_update_version"] = str(new_version)
-        _db_write(_db)
 
         if enabled:
             print(c("Update applied successfully", GREEN, BOLD))
@@ -828,16 +762,19 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
             print(c("Restarting...", YELLOW, BOLD))
             print("")
         time.sleep(2)
-        os.execv(sys.executable, [sys.executable] + restart_argv)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
-    self_path = Path(restart_argv[0]) if restart_argv else None
+    finally:
+        rb.cleanup()
+
+    self_path = Path(sys.argv[0]) if sys.argv else None
     if self_path is not None:
         if not self_path.is_absolute():
             self_path = Path.cwd() / self_path
         if not self_path.exists():
             sys.exit(0)
 
-    os.execv(sys.executable, [sys.executable] + restart_argv)
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 def ask_install_update(new_version: str, timeout: int = 10, enabled=True) -> bool:
@@ -1127,97 +1064,14 @@ def _migrate_legacy_folder_name():
     os.execv(sys.executable, [sys.executable, str(new_script)] + sys.argv[1:])
 
 
-def _restore_pending_update(db: dict):
-    backup_dir = db.get("pending_update_backup")
-    version = db.get("pending_update_version")
-
-    if backup_dir:
-        try:
-            bdir = Path(backup_dir)
-            manifest_path = bdir / "manifest.json"
-            if manifest_path.exists():
-                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                for p in manifest.get("created", []):
-                    try:
-                        Path(p).unlink()
-                    except Exception:
-                        pass
-                for dest_str, backup_str in manifest.get("map", {}).items():
-                    try:
-                        _safe_mkdir(Path(dest_str).parent)
-                        _safe_copy(Path(backup_str), Path(dest_str))
-                    except Exception:
-                        pass
-            shutil.rmtree(bdir, ignore_errors=True)
-        except Exception:
-            pass
-
-        if version:
-            mark_version_failed(str(version))
-            _write_update_status(f"Update to {version} failed to start - rolled back")
-
-    db.pop("pending_update_backup", None)
-    db.pop("pending_update_version", None)
-    db.pop("pending_update_bounced", None)
-    db["process_status"] = "running"
-    _db_write(db)
-
-
-def _confirm_pending_update():
-    try:
-        db = _db_read()
-        backup_dir = db.get("pending_update_backup")
-        if backup_dir:
-            shutil.rmtree(Path(backup_dir), ignore_errors=True)
-        db.pop("pending_update_backup", None)
-        db.pop("pending_update_version", None)
-        db.pop("pending_update_bounced", None)
-        _db_write(db)
-        log_write("Update confirmed stable - rollback point cleared.")
-    except Exception:
-        pass
-
-
-def _handle_rollback_arg():
-    if len(sys.argv) < 3 or sys.argv[1] != "__rollback":
-        return
-
-    target_version = sys.argv[2]
-    tty = _isatty()
-
-    version, source_type, source_value = find_release_by_version(target_version)
-    if not version:
-        print(f"Version {target_version} was not found via the configured update source (UPDATE_MODE={UPDATE_MODE}).")
-        sys.exit(1)
-
-    print(f"Manual rollback: installing version {version} via UPDATE_MODE={UPDATE_MODE}...")
-    safe_apply_update_any(version, source_type, source_value, enabled=tty, restart_argv=[sys.argv[0]])
-
-
 def main():
     global _TTY_ENABLED, _LOG_FILE, _LOG_ROTATE_THREAD, _STATUS, _AGENT
-
-    _handle_rollback_arg()
 
     _migrate_legacy_folder_name()
 
     _db = _db_read()
     _last_status = _db.get("process_status")
-    pending_backup = _db.get("pending_update_backup")
-
     if _last_status is not None and _last_status != "Clean shutdown":
-        if pending_backup and _db.get("pending_update_bounced"):
-            _restore_pending_update(_db)
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-            return
-
-        if pending_backup:
-            _db["pending_update_bounced"] = True
-            _db["process_status"] = "running"
-            _db_write(_db)
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-            return
-
         try:
             os.remove(_DB_FILE)
         except FileNotFoundError:
@@ -1227,9 +1081,6 @@ def main():
 
     _db["process_status"] = "running"
     _db_write(_db)
-
-    if pending_backup:
-        threading.Timer(60.0, _confirm_pending_update).start()
 
     clear_all_failed_markers()
 
