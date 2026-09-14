@@ -19,9 +19,9 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.36"
+VERSION = "2.0.37"
 
-CONFIG_PATH = "config.yaml"
+CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
 LOG_FILE_PATH = "tuxd.log"
 
@@ -196,7 +196,7 @@ def load_logo_lines(path: Path, solid=True):
         return []
 
     if solid:
-        lines = [ln.replace("░", " ") for ln in lines]
+        lines = [ln.replace("â–‘", " ") for ln in lines]
 
     while lines and lines[0] == "":
         lines.pop(0)
@@ -243,7 +243,7 @@ def print_banner(enabled):
     lines += 1
     print(c(center_text("", cols), YELLOW, BOLD))
     lines += 1
-    print(c(center_text("By Henrik Isefjær Ludvigsen", cols), GRAY, ITALIC))
+    print(c(center_text("By Henrik IsefjÃ¦r Ludvigsen", cols), GRAY, ITALIC))
     lines += 1
     print(c(center_text("github.com/henriklud", cols), GRAY, ITALIC))
     lines += 1
@@ -569,7 +569,7 @@ def _safe_copy(src: Path, dest: Path) -> None:
         r = subprocess.run(['sudo', 'cp', '-p', str(src), str(dest)],
                            capture_output=True, text=True)
         if r.returncode != 0:
-            raise PermissionError(f"Cannot copy {src} → {dest}: {r.stderr.strip()}")
+            raise PermissionError(f"Cannot copy {src} â†’ {dest}: {r.stderr.strip()}")
         subprocess.run(['sudo', 'chown', f'{os.getuid()}:{os.getgid()}', str(dest)],
                        check=True)
 
@@ -593,7 +593,7 @@ def _safe_replace(src: Path, dest: Path) -> None:
         r = subprocess.run(['sudo', 'mv', str(src), str(dest)],
                            capture_output=True, text=True)
         if r.returncode != 0:
-            raise PermissionError(f"Cannot move {src} → {dest}: {r.stderr.strip()}")
+            raise PermissionError(f"Cannot move {src} â†’ {dest}: {r.stderr.strip()}")
         subprocess.run(['sudo', 'chown', f'{os.getuid()}:{os.getgid()}', str(dest)],
                        check=True)
 
@@ -669,7 +669,7 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
         _safe_mkdir(dest_root)
 
         for fn in files:
-            if fn in ("config.yaml", "TuxD.py"):
+            if fn in (CONFIG_PATH, "config.yaml", "TuxD.py"):
                 continue
 
             src_file = Path(root) / fn
@@ -903,7 +903,7 @@ def _publish_emergency_error(cfg, reason):
         device_info = {
             "identifiers": [device_name],
             "name": device_name,
-            "manufacturer": "Henrik Isefjær Olsen",
+            "manufacturer": "Henrik IsefjÃ¦r Olsen",
             "model": f"TuxD Linux Agent Version {VERSION}",
             "sw_version": VERSION,
         }
@@ -1089,10 +1089,23 @@ def _migrate_legacy_folder_name():
     os.execv(sys.executable, [sys.executable, str(new_script)] + sys.argv[1:])
 
 
+def _migrate_legacy_config_name():
+    old_path = Path("config.yaml")
+    new_path = Path(CONFIG_PATH)
+    if new_path.exists() or not old_path.exists():
+        return
+    try:
+        os.rename(str(old_path), str(new_path))
+        log_write(f"Migrated legacy {old_path} -> {new_path}.")
+    except Exception as e:
+        log_write(f"Failed to migrate {old_path} -> {new_path}: {e}")
+
+
 def main():
     global _TTY_ENABLED, _LOG_FILE, _LOG_ROTATE_THREAD, _STATUS, _AGENT
 
     _migrate_legacy_folder_name()
+    _migrate_legacy_config_name()
 
     _db = _db_read()
     _last_status = _db.get("process_status")
@@ -1277,7 +1290,7 @@ def main():
                 break
 
             if enabled:
-                status.write(c(f"MQTT broker lost — retrying in {retry_delay}s...", YELLOW, BOLD))
+                status.write(c(f"MQTT broker lost â€” retrying in {retry_delay}s...", YELLOW, BOLD))
             log_write(f"MQTT broker lost. Retrying in {retry_delay}s.")
 
             time.sleep(retry_delay)

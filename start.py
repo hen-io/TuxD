@@ -200,11 +200,11 @@ def full_repair(version=None, force=False):
                     dest_root = PROJECT_DIR / rel
                     dest_root.mkdir(parents=True, exist_ok=True)
                     for fn in files:
-                        if fn == "config.yaml":
+                        if fn in ("tuxd.conf", "config.yaml"):
                             continue
                         shutil.copy2(Path(root) / fn, dest_root / fn)
 
-        log(f"Repair complete - {found_version or version or 'latest'} installed (config.yaml untouched).")
+        log(f"Repair complete - {found_version or version or 'latest'} installed (config file untouched).")
         return True
     except Exception as e:
         log(f"Repair failed: {e}")
@@ -224,7 +224,7 @@ def main():
 
         if exit_code == CONFIG_ERROR_EXIT:
             log(f"TuxD.py reported a configuration error (exit {CONFIG_ERROR_EXIT}) - "
-                f"fix config.yaml. Retrying in 60s.")
+                f"fix the config file. Retrying in 60s.")
             time.sleep(60)
             continue
 

@@ -1,0 +1,111 @@
+TuxD - Linux Server Monitoring Agent for Home Assistant
+========================================================
+
+WHAT IT IS
+----------
+A Python agent that runs on a Linux server and publishes system metrics and
+controls to Home Assistant over MQTT, using HA's MQTT auto-discovery (no
+manual entity setup in HA - entities just appear on the device once the
+agent connects). Everything is config-driven and every module defaults to
+disabled unless the config says otherwise, so a fresh install starts minimal
+and safe.
+
+FEATURES
+--------
+
+Core / always-on:
+- MQTT connection with auto-reconnect and a retained "Error" binary_sensor
+  (device_class: problem) that flips on with a reason whenever something
+  the agent depends on breaks.
+- Home Assistant MQTT auto-discovery for every entity, with a "Refresh TuxD
+  Entities" button to force a clean re-registration if HA's state ever gets
+  out of sync.
+- "Restart TuxD" button and "Force Refresh All Sensors" button (re-polls
+  every sensor and re-checks for updates immediately, ignoring each
+  module's own update_interval).
+- Two-way terminal: a text input box and output log in HA that pipe into
+  the agent's own stdin/stdout, so the box's shell output is visible in HA.
+- Live, in-HA config editing: many settings (enable/disable switches, poll
+  intervals, thresholds) are exposed as HA switch/number/text entities that
+  write straight back to the config file and hot-apply.
+- Self-update: checks GitHub releases on an interval, can install
+  automatically or prompt first, with an HA button to trigger a check/install
+  on demand. Supports a GITHUB_TOKEN (env var or a github.token file) to
+  raise the GitHub API's unauthenticated 60/hour rate limit to 5000/hour.
+- Config file (tuxd.conf) is always preserved across updates/reinstalls -
+  never overwritten with defaults, only merged (new keys added, existing
+  values left alone).
+
+Built-in monitors (each independently enable/disable-able):
+- CPU load (host-wide and/or per a configured core count), with iowait
+  handling options.
+- Memory usage.
+- I/O wait percentage.
+- Internet reachability check (ping/HTTP check against a configurable host).
+- Lag monitor: rolling ping latency to a host, plus a "high latency"
+  binary_sensor above a configurable threshold.
+- LM Sensors: every hardware sensor `sensors -j` reports, individually
+  enable/disable-able, plus an auto-computed average-temperature sensor.
+- Disks: per-disk usage and (optional) SMART health data.
+- Network: per-interface throughput stats.
+- Docker: container counts, a "containers with errors" problem sensor
+  (unhealthy / restarting / restart-looping / OOM-killed / bad exit, with
+  JSON attributes listing which containers and why), per-image "update
+  available" sensors (compares local vs. registry digest), optional
+  per-container CPU/memory/network/disk stats, and an HA button to trigger
+  `docker compose pull && up -d` for an out-of-date image.
+- Host OS updates: auto-detects the system's package manager (apt, dnf,
+  yum, zypper, pacman), reports how many updates are pending, and can
+  expose an "Update and reboot" button (or a fully custom check/list/install
+  command set).
+- Arbitrary shell-command sensors, buttons, "select" (dropdown) entities,
+  and scheduled background tasks - all defined in config, no code changes
+  needed to add one.
+- Log-file sensors: tail a file (plain text or JSON) and expose the parsed
+  value as a sensor, plus rolling "hits in the last 15m/1h/today" counters.
+- A fixed set of one-shot status commands (uptime, kernel version, hostname,
+  CPU name, public IP, process count, KVM VM count, LXC container count,
+  etc.) - each is just a shell command away from being enabled.
+
+Fleet / ops tooling (outside the running agent itself):
+- start.py: a supervisor that runs TuxD.py, auto-restarts it on crash (with
+  a longer backoff for a reported config error), and provides an
+  independent `--fix [VERSION]` command that reinstalls straight from
+  GitHub even if the running agent's own code is broken.
+- preperations.sh: idempotent post-update migration script - renames a
+  legacy Py-K93SYS/k93sys install to TuxD, converts old systemd service
+  units (or creates one from scratch if none exists) to point at start.py,
+  in either --user or --system scope, and cleans up duplicate/stale units.
+- Bootstrap scripts (install/git-upgrade.sh, install/bootstrap-fleet.sh) to
+  bring a host on a very old version - or a whole fleet over SSH - straight
+  to the current release and a correctly-configured systemd service in one
+  command, config file preserved throughout.
+
+DEPENDENCIES
+------------
+
+Python: 3.9+ (uses standard f-strings, pathlib, etc. throughout; no hard
+floor has been tested below this).
+
+Python packages (pip):
+- pyyaml       - config file parsing
+- paho-mqtt    - MQTT client
+
+System tools (all optional except where noted - each related feature is
+simply unavailable/disabled if its tool is missing):
+- systemd                    - running the agent as a service (recommended,
+                                not required to run TuxD.py directly)
+- smartmontools (smartctl)   - disk SMART health data
+- lm-sensors (sensors)       - hardware temperature sensors
+- docker + docker compose    - Docker monitoring module
+- skopeo                     - faster/cleaner registry digest checks for
+                                Docker image-update detection; falls back to
+                                `docker manifest inspect` if not installed
+- ping (iputils)             - lag monitor / internet reachability check
+- curl                       - used only by the install/upgrade shell
+                                scripts, not by the agent itself
+
+Network:
+- Outbound access to your MQTT broker (default port 1883).
+- Outbound HTTPS to api.github.com / github.com for update checks
+  (unauthenticated: 60 requests/hour per source IP; see GITHUB_TOKEN above).

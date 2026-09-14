@@ -16,6 +16,8 @@ def _slug(s: str) -> str:
 
 _FLOAT_OPTS = {"min": 0.1, "max": 86400.0, "step": 0.1}
 
+_CONFIG_FILE = "tuxd.conf"
+
 
 class ConfigAgentMixin:
     def _config_entity_id(self, domain, key):
@@ -170,7 +172,7 @@ class ConfigAgentMixin:
 
     def register_config_numbers(self):
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 fresh_cfg = yaml.safe_load(f) or {}
         except Exception:
             fresh_cfg = self.config
@@ -231,10 +233,10 @@ class ConfigAgentMixin:
         new_value = round(raw, 2) if entry["is_float"] else int(raw)
 
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
             self._cfgnum_apply(cfg, entry["path_info"], new_value)
-            with open("config.yaml", "w", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
                 yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         except Exception:
             return
@@ -325,7 +327,7 @@ class ConfigAgentMixin:
 
     def register_config_texts(self):
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 fresh_cfg = yaml.safe_load(f) or {}
         except Exception:
             fresh_cfg = self.config
@@ -364,10 +366,10 @@ class ConfigAgentMixin:
             return
 
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
             self._cfgnum_apply(cfg, entry["path_info"], new_value)
-            with open("config.yaml", "w", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
                 yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         except Exception:
             return
@@ -570,7 +572,7 @@ class ConfigAgentMixin:
 
     def register_config_switches(self):
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 fresh_cfg = yaml.safe_load(f) or {}
         except Exception:
             fresh_cfg = self.config
@@ -621,10 +623,10 @@ class ConfigAgentMixin:
         new_value = payload == "ON"
 
         try:
-            with open("config.yaml", "r", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
             self._cfgnum_apply(cfg, entry["path_info"], new_value)
-            with open("config.yaml", "w", encoding="utf-8") as f:
+            with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
                 yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         except Exception:
             return
