@@ -39,6 +39,8 @@ class TerminalMixin:
                 icon="mdi:console-line"
             )
             self.publish(self.terminal_input_topic, "")
+        else:
+            self.publish(self._discovery_topic("text", "terminal_input"), "", retain=True)
 
         if self._terminal_output_enabled():
             self._sensor_discovery(

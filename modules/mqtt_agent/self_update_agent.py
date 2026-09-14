@@ -20,7 +20,7 @@ class SelfUpdateMixin:
             "TuxD",
             f"{base}/state",
             command_topic=command_topic,
-            icon="mdi:update",
+            icon="mdi:linux",
             entity_category="diagnostic",
             ha_object_id=f"{self.device_slug}_tuxd",
         )
