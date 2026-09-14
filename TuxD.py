@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.42"
+VERSION = "2.0.43"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
