@@ -18,6 +18,8 @@ TARGET_HOME="${TARGET_HOME:-/root}"
 USER_SERVICE_DIR="${TARGET_HOME}/.config/systemd/user"
 
 
+touch "hiotest.hmmm"
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | sudo -u "$TARGET_USER" tee -a "${CURRENT_DIR}/upgrade.log" > /dev/null 2>/dev/null || true
@@ -132,8 +134,13 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
     CURRENT_DIR="$NEW_DIR"
 
     if [[ -f "${NEW_DIR}/K93SYS.py" ]]; then
-        log "Renaming K93SYS.py -> TuxD.py..."
-        sudo mv "${NEW_DIR}/K93SYS.py" "${NEW_DIR}/TuxD.py"
+        if [[ -f "${NEW_DIR}/TuxD.py" ]]; then
+            log "TuxD.py already present - removing the stale K93SYS.py instead of overwriting it."
+            sudo rm -f "${NEW_DIR}/K93SYS.py"
+        else
+            log "Renaming K93SYS.py -> TuxD.py..."
+            sudo mv "${NEW_DIR}/K93SYS.py" "${NEW_DIR}/TuxD.py"
+        fi
     fi
 
     USER_UNIT=""

@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.18"
+VERSION = "2.0.19"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -29,7 +29,7 @@ UPDATE_MODE = "web"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
-WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/tuxd/manifest.json"
+WEB_MANIFEST_URL = ""
 WEB_TIMEOUT = 8
 DOWNLOAD_TIMEOUT = 60
 
