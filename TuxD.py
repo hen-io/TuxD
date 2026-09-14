@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.38"
+VERSION = "2.0.39"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -1144,8 +1144,8 @@ def main():
 
     try:
         cfg = yaml.safe_load(Path(CONFIG_PATH).read_text(encoding="utf-8"))
-    except Exception:
-        print(c("Failed to load configuration!", RED, BOLD))
+    except Exception as e:
+        print(c(f"Failed to load configuration ({CONFIG_PATH}): {e}", RED, BOLD))
         sys.exit(EXIT_CONFIG_ERROR)
 
     device_cfg = (cfg or {}).get("device", {}) or {}
