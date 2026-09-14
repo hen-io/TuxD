@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.37"
+VERSION = "2.0.38"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -196,7 +196,7 @@ def load_logo_lines(path: Path, solid=True):
         return []
 
     if solid:
-        lines = [ln.replace("â–‘", " ") for ln in lines]
+        lines = [ln.replace("Ã¢â€“â€˜", " ") for ln in lines]
 
     while lines and lines[0] == "":
         lines.pop(0)
@@ -243,7 +243,7 @@ def print_banner(enabled):
     lines += 1
     print(c(center_text("", cols), YELLOW, BOLD))
     lines += 1
-    print(c(center_text("By Henrik IsefjÃ¦r Ludvigsen", cols), GRAY, ITALIC))
+    print(c(center_text("By Henrik IsefjÃƒÂ¦r Ludvigsen", cols), GRAY, ITALIC))
     lines += 1
     print(c(center_text("github.com/henriklud", cols), GRAY, ITALIC))
     lines += 1
@@ -569,7 +569,7 @@ def _safe_copy(src: Path, dest: Path) -> None:
         r = subprocess.run(['sudo', 'cp', '-p', str(src), str(dest)],
                            capture_output=True, text=True)
         if r.returncode != 0:
-            raise PermissionError(f"Cannot copy {src} â†’ {dest}: {r.stderr.strip()}")
+            raise PermissionError(f"Cannot copy {src} Ã¢â€ â€™ {dest}: {r.stderr.strip()}")
         subprocess.run(['sudo', 'chown', f'{os.getuid()}:{os.getgid()}', str(dest)],
                        check=True)
 
@@ -593,7 +593,7 @@ def _safe_replace(src: Path, dest: Path) -> None:
         r = subprocess.run(['sudo', 'mv', str(src), str(dest)],
                            capture_output=True, text=True)
         if r.returncode != 0:
-            raise PermissionError(f"Cannot move {src} â†’ {dest}: {r.stderr.strip()}")
+            raise PermissionError(f"Cannot move {src} Ã¢â€ â€™ {dest}: {r.stderr.strip()}")
         subprocess.run(['sudo', 'chown', f'{os.getuid()}:{os.getgid()}', str(dest)],
                        check=True)
 
@@ -903,7 +903,7 @@ def _publish_emergency_error(cfg, reason):
         device_info = {
             "identifiers": [device_name],
             "name": device_name,
-            "manufacturer": "Henrik IsefjÃ¦r Olsen",
+            "manufacturer": "Henrik IsefjÃƒÂ¦r Olsen",
             "model": f"TuxD Linux Agent Version {VERSION}",
             "sw_version": VERSION,
         }
@@ -932,12 +932,25 @@ def _publish_emergency_error(cfg, reason):
             "json_attributes_topic": f"{base_topic}/error_attributes",
             "entity_category": "diagnostic",
         }
+        reason_payload = {
+            "name": "Error Reason",
+            "state_topic": f"{base_topic}/error_reason",
+            "unique_id": f"{device_name}_system_error_reason",
+            "device": device_info,
+            "icon": "mdi:alert-circle-outline",
+            "entity_category": "diagnostic",
+        }
         client.publish(
             f"homeassistant/binary_sensor/{device_name}/system_error/config",
             json.dumps(discovery_payload), retain=True,
         )
+        client.publish(
+            f"homeassistant/sensor/{device_name}/system_error_reason/config",
+            json.dumps(reason_payload), retain=True,
+        )
         client.publish(f"{base_topic}/error", "ON", retain=True)
         client.publish(f"{base_topic}/error_attributes", json.dumps({"reason": reason}), retain=True)
+        client.publish(f"{base_topic}/error_reason", reason, retain=True)
         time.sleep(0.5)
 
         client.loop_stop()
@@ -1290,7 +1303,7 @@ def main():
                 break
 
             if enabled:
-                status.write(c(f"MQTT broker lost â€” retrying in {retry_delay}s...", YELLOW, BOLD))
+                status.write(c(f"MQTT broker lost Ã¢â‚¬â€ retrying in {retry_delay}s...", YELLOW, BOLD))
             log_write(f"MQTT broker lost. Retrying in {retry_delay}s.")
 
             time.sleep(retry_delay)

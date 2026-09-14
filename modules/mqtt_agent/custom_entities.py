@@ -81,12 +81,16 @@ class CustomEntitiesMixin:
                         pass
                 if write_to_terminal:
                     def _run(c=cmd):
-                        output = run_cmd(c)
+                        with self.busy():
+                            output = run_cmd(c)
                         if output and self._terminal_output_enabled():
                             for line in output.split("\n"):
                                 if line:
                                     self.publish(self.terminal_output_topic, line)
                     threading.Thread(target=_run, daemon=True).start()
                 else:
-                    threading.Thread(target=run_cmd, args=(cmd,), daemon=True).start()
+                    def _run_quiet(c=cmd):
+                        with self.busy():
+                            run_cmd(c)
+                    threading.Thread(target=_run_quiet, daemon=True).start()
                 return

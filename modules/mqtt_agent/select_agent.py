@@ -97,7 +97,8 @@ class SelectMixin:
         cmd = (matched_opt.get("cmd") or "").strip()
         if cmd:
             def _run(c=cmd, wtt=write_to_terminal):
-                output = run_cmd(c)
+                with self.busy():
+                    output = run_cmd(c)
                 if wtt and output and self._terminal_output_enabled():
                     for line in output.split("\n"):
                         if line:

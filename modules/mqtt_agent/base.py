@@ -54,6 +54,8 @@ class HAMQTTBase:
         self._CLR_GRAY = "\033[90m"
         self._CLR_RESET = "\033[0m"
 
+        self._interactive = self._use_color
+
         self._state_topic_to_name = {}
         self._known_discovery_topics = set()
         self._stop_event = threading.Event()

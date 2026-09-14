@@ -19,6 +19,8 @@ class TerminalMixin:
         return val if isinstance(val, dict) else {}
 
     def _terminal_output_enabled(self):
+        if getattr(self, "_interactive", False):
+            return True
         return bool(self._terminal_output_cfg().get("enabled", True))
 
     def init_terminal(self):
@@ -91,7 +93,8 @@ class TerminalMixin:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"$ {cmd}")
 
-            output = run_cmd(cmd)
+            with self.busy():
+                output = run_cmd(cmd)
             lines = output.split("\n") if output else [""]
 
             if len(lines) > max_queue:

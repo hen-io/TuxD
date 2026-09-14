@@ -10,7 +10,8 @@ class TasksMixin:
         self._tasks_cfg = self.config.get("tasks", []) or []
 
     def _run_task(self, cmd, write_to_terminal=True):
-        output = run_cmd(cmd)
+        with self.busy():
+            output = run_cmd(cmd)
         if write_to_terminal and self._terminal_output_enabled() and output:
             for line in output.split("\n"):
                 if line:
