@@ -23,7 +23,8 @@ class RestartMixin:
             "force_poll_agent",
             "Force Refresh All Sensors",
             f"{self.base_topic}/force_poll/set",
-            icon="mdi:sync"
+            icon="mdi:sync",
+            entity_category="diagnostic"
         )
 
     def handle_restart_message(self):
