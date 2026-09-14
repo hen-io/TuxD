@@ -5,7 +5,7 @@ import threading
 class SelfUpdateMixin:
     def init_self_update(self):
         device_cfg = self.config.get("device", {}) or {}
-        self._self_update_interval = float(device_cfg.get("self_update_check_interval", 3600))
+        self._self_update_interval = float(device_cfg.get("self_update_check_interval", 21600))
         self._self_update_allow_install = bool(device_cfg.get("self_update_allow_install", True))
         self._self_update_installing = False
         self._self_update_last_state = None
@@ -23,6 +23,14 @@ class SelfUpdateMixin:
             icon="mdi:linux",
             entity_category="diagnostic",
             ha_object_id=f"{self.device_slug}_tuxd",
+        )
+
+        self._button_discovery(
+            "self_update_check",
+            "Check for TuxD Updates",
+            f"{base}/check/set",
+            icon="mdi:cloud-refresh",
+            entity_category="diagnostic",
         )
 
         if not self._self_update_installing and self._self_update_last_state is None:
@@ -66,6 +74,9 @@ class SelfUpdateMixin:
         state = dict(self._self_update_last_state)
         state["in_progress"] = in_progress
         self.publish(f"{self.base_topic}/self_update/state", json.dumps(state), retain=True)
+
+    def handle_self_update_check(self):
+        threading.Thread(target=self._publish_self_update_state, daemon=True).start()
 
     def self_update_loop(self):
         while not self._stop_event.is_set():

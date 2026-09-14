@@ -259,7 +259,7 @@ class HAMQTTBase:
             retain=True
         )
 
-    def _button_discovery(self, object_id, name, command_topic, icon=None):
+    def _button_discovery(self, object_id, name, command_topic, icon=None, entity_category=None):
         payload = {
             "name": name,
             "command_topic": command_topic,
@@ -268,6 +268,8 @@ class HAMQTTBase:
         }
         if icon:
             payload["icon"] = icon
+        if entity_category:
+            payload["entity_category"] = entity_category
 
         self.publish(
             self._discovery_topic("button", object_id),

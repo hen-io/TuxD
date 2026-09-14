@@ -161,6 +161,10 @@ class HAMQTTAgent(
             self.handle_self_update_install()
             return
 
+        if topic == f"{self.base_topic}/self_update/check/set":
+            self.handle_self_update_check()
+            return
+
     def start(self, on_ready=None):
         self.connect()
 
@@ -182,6 +186,7 @@ class HAMQTTAgent(
         self.client.subscribe(f"{self.base_topic}/docker/update/+/set")
         self.client.subscribe(f"{self.base_topic}/host_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")
+        self.client.subscribe(f"{self.base_topic}/self_update/check/set")
 
         if on_ready is not None:
             try:

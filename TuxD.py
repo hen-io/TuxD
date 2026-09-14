@@ -18,18 +18,14 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.51"
+VERSION = "1.0.52"
 
 CONFIG_PATH = "tuxd.conf"
-RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
 LOG_FILE_PATH = "tuxd.log"
-
-UPDATE_MODE = "github"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
-WEB_MANIFEST_URL = ""
-WEB_TIMEOUT = 8
+GITHUB_TIMEOUT = 8
 DOWNLOAD_TIMEOUT = 60
 
 GITHUB_REPO = "hen-io/TuxD"
@@ -259,12 +255,6 @@ def print_banner(enabled):
     return lines
 
 
-def _normalize_update_mode(mode) -> str:
-    mode = (mode or "none").lower().strip()
-    aliases = {"git": "github"}
-    return aliases.get(mode, mode)
-
-
 def version_tuple(v: str):
     parts = re.findall(r'\d+', str(v))
     return tuple(int(p) for p in parts) if parts else (0,)
@@ -309,22 +299,6 @@ def _select_update_target(current_version, available_versions, exclude=None, pre
     return None
 
 
-def find_newer_release_local(prefer_latest=False):
-    if not os.path.isdir(RELEASES_DIR):
-        return None, None
-
-    releases = []
-    for entry in os.listdir(RELEASES_DIR):
-        if re.match(r'^\d[\d.\-a-zA-Z ]*$', entry):
-            releases.append(entry)
-
-    target = _select_update_target(VERSION, releases, exclude=is_version_recently_failed, prefer_latest=prefer_latest)
-    if target:
-        return target, os.path.join(RELEASES_DIR, target)
-
-    return None, None
-
-
 def _github_token():
     token = os.environ.get("GITHUB_TOKEN", "").strip()
     if token:
@@ -358,44 +332,13 @@ def _fetch_json(url: str, timeout: int):
     return json.loads(data.decode("utf-8-sig", errors="replace"))
 
 
-def find_newer_release_web(prefer_latest=False):
-    if not WEB_MANIFEST_URL:
-        return None, None
-
-    try:
-        manifest = _fetch_json(WEB_MANIFEST_URL, timeout=WEB_TIMEOUT)
-    except Exception:
-        return None, None
-
-    versions = [str(v).strip() for v in (manifest.get("versions") or []) if str(v).strip()]
-    latest = str(manifest.get("latest", "")).strip()
-    if latest and latest.replace(".", "").isdigit() and latest not in versions:
-        versions.append(latest)
-
-    versions = [v for v in versions if v.replace(".", "").isdigit()]
-    if not versions:
-        return None, None
-
-    target = _select_update_target(VERSION, versions, exclude=is_version_recently_failed, prefer_latest=prefer_latest)
-    if not target:
-        return None, None
-
-    if target == latest:
-        download_url = str(manifest.get("download_url", "")).strip()
-        if download_url:
-            return target, download_url
-
-    base = WEB_MANIFEST_URL.rsplit("/", 1)[0]
-    return target, f"{base}/releases/{target}.tar.gz"
-
-
 def find_newer_release_github(prefer_latest=False):
     if not GITHUB_REPO:
         return None, None
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
     try:
-        releases = _fetch_json(url, timeout=WEB_TIMEOUT)
+        releases = _fetch_json(url, timeout=GITHUB_TIMEOUT)
     except Exception as e:
         log_write(f"GitHub update check failed ({url}): {e}")
         return None, None
@@ -496,30 +439,11 @@ def clear_all_failed_markers():
 
 
 def choose_update():
-    mode = _normalize_update_mode(UPDATE_MODE)
-    candidates = []
     prefer_latest = _read_upgrade_info_flag("extra_deps")
-
-    if mode in ("local", "both", "all"):
-        v, path = find_newer_release_local(prefer_latest=prefer_latest)
-        if v and path and not is_version_recently_failed(v):
-            candidates.append((v, "local", path))
-
-    if mode in ("web", "both", "all"):
-        v, url = find_newer_release_web(prefer_latest=prefer_latest)
-        if v and url and not is_version_recently_failed(v):
-            candidates.append((v, "web", url))
-
-    if mode in ("github", "all"):
-        v, url = find_newer_release_github(prefer_latest=prefer_latest)
-        if v and url and not is_version_recently_failed(v):
-            candidates.append((v, "web", url))
-
-    if not candidates:
-        return None, None, None
-
-    candidates.sort(key=lambda x: version_tuple(x[0]))
-    return candidates[-1]
+    v, url = find_newer_release_github(prefer_latest=prefer_latest)
+    if v and url and not is_version_recently_failed(v):
+        return v, "github", url
+    return None, None, None
 
 
 def _download_to_file(url: str, dest_path: Path, timeout: int):
@@ -727,10 +651,7 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
             print("")
         time.sleep(1)
 
-        if source_type == "local":
-            _apply_update_from_dir(Path(source_value), enabled, rb)
-
-        elif source_type == "web":
+        if source_type == "github":
             with tempfile.TemporaryDirectory() as td:
                 td_path = Path(td)
                 tar_path = td_path / f"{new_version}.tar.gz"
