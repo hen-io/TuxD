@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.14"
+VERSION = "2.0.15"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -1239,7 +1239,7 @@ def main():
     log_level = str(device_cfg.get("log_level", "all")).lower().strip()
     if log_level not in ("all", "error"):
         log_level = "all"
-    retry_delay = int((cfg.get("mqtt") or {}).get("retry_delay", 30))
+    retry_delay = int(((cfg or {}).get("mqtt") or {}).get("retry_delay", 30))
     enabled = tty_output and _isatty()
     _TTY_ENABLED = enabled
 
