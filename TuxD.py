@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.15"
+VERSION = "2.0.16"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -673,6 +673,10 @@ def _apply_update_from_dir(src_root: Path, enabled: bool, rb: _Rollback):
         raise RuntimeError("Release missing 'modules' directory")
 
     new_launcher = src_root / "TuxD.py"
+    diag = f"Applying update from {src_root} - launcher found: {new_launcher.exists()} - contents: {sorted(p.name for p in src_root.iterdir())}"
+    if enabled:
+        print(c(diag, DIM))
+    log_write(diag)
     if new_launcher.exists():
         with open(new_launcher, "r", encoding="utf-8-sig", errors="replace") as f:
             ast.parse(f.read(), filename=str(new_launcher))
@@ -753,6 +757,11 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
             print("")
         time.sleep(1)
 
+        diag = f"safe_apply_update_any: version={new_version} source_type={source_type} source_value={source_value}"
+        if enabled:
+            print(c(diag, DIM))
+        log_write(diag)
+
         if source_type == "local":
             _apply_update_from_dir(Path(source_value), enabled, rb)
 
@@ -767,6 +776,10 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
                 _extract_tar(tar_path, extract_dir)
 
                 release_root = _find_release_root(extract_dir)
+                diag = f"_find_release_root: extract_dir contents={sorted(p.name for p in extract_dir.iterdir())} -> release_root={release_root}"
+                if enabled:
+                    print(c(diag, DIM))
+                log_write(diag)
                 _apply_update_from_dir(release_root, enabled, rb)
 
         else:
