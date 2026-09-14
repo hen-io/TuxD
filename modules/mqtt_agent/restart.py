@@ -19,6 +19,12 @@ class RestartMixin:
             f"{self.base_topic}/refresh/set",
             icon="mdi:refresh"
         )
+        self._button_discovery(
+            "force_poll_agent",
+            "Force Refresh All Sensors",
+            f"{self.base_topic}/force_poll/set",
+            icon="mdi:sync"
+        )
 
     def handle_restart_message(self):
         def _restart():
@@ -64,3 +70,23 @@ class RestartMixin:
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
         threading.Thread(target=_refresh, daemon=True).start()
+
+    def handle_force_poll_message(self):
+        def _force_poll():
+            ts = datetime.datetime.now().strftime("%H:%M:%S")
+            msg = f'{ts}: Button "Force Refresh All Sensors" pressed - restarting to poll everything now...'
+            self.state_cache[self.terminal_output_topic] = msg
+            self.client.publish(self.terminal_output_topic, msg)
+            if self.tty_output:
+                print(self._gray(msg))
+            if self.log_file is not None:
+                try:
+                    full_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    self.log_file.write(f"[{full_ts}] {msg}\n")
+                    self.log_file.flush()
+                except Exception:
+                    pass
+            time.sleep(1.0)
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        threading.Thread(target=_force_poll, daemon=True).start()

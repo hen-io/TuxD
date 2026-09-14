@@ -125,6 +125,10 @@ class HAMQTTAgent(
             self.handle_refresh_message()
             return
 
+        if topic == f"{self.base_topic}/force_poll/set":
+            self.handle_force_poll_message()
+            return
+
         if topic.startswith(f"{self.base_topic}/custom_button/") and topic.endswith("/set"):
             self.handle_custom_button(topic)
             return
@@ -170,6 +174,7 @@ class HAMQTTAgent(
             self.client.subscribe(f"{self.base_topic}/terminal_input/set")
         self.client.subscribe(f"{self.base_topic}/restart/set")
         self.client.subscribe(f"{self.base_topic}/refresh/set")
+        self.client.subscribe(f"{self.base_topic}/force_poll/set")
         self.client.subscribe(f"{self.base_topic}/select/+/set")
         self.client.subscribe(f"{self.base_topic}/cfgnum/+/set")
         self.client.subscribe(f"{self.base_topic}/cfgsw/+/set")

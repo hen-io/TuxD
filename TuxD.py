@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.33"
+VERSION = "2.0.36"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
