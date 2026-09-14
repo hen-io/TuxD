@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.13"
+VERSION = "2.0.14"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
@@ -271,36 +271,46 @@ def version_tuple(v: str):
     return tuple(int(p) for p in parts) if parts else (0,)
 
 
-def _is_milestone_version(v) -> bool:
-    parts = version_tuple(v)
-    return len(parts) < 3 or parts[2] == 0
+def _read_upgrade_info_flag(name: str) -> bool:
+    try:
+        path = Path(__file__).resolve().parent / "bin" / "upgrade" / "upgrade.info"
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            if key.strip().lower() == name.lower():
+                return value.strip().lower() in ("1", "true", "yes")
+    except Exception:
+        pass
+    return False
 
 
-def _select_update_target(current_version, available_versions, exclude=None):
+def _select_update_target(current_version, available_versions, exclude=None, prefer_latest=False):
     exclude = exclude or (lambda v: False)
-    excluded_pool = [v for v in available_versions if not exclude(v)]
-    if not excluded_pool:
+    pool = [v for v in available_versions if not exclude(v)]
+    if not pool:
         return None
 
     cur = version_tuple(current_version)
-    milestone_pool = [v for v in excluded_pool if _is_milestone_version(v)]
 
-    newer_milestones = sorted((v for v in milestone_pool if version_tuple(v) > cur), key=version_tuple)
-    if newer_milestones:
-        return newer_milestones[0]
+    if prefer_latest:
+        latest = max(pool, key=version_tuple)
+        return latest if version_tuple(latest) != cur else None
 
-    if any(version_tuple(v) > cur for v in excluded_pool):
-        return None
+    newer = sorted((v for v in pool if version_tuple(v) > cur), key=version_tuple)
+    if newer:
+        return newer[0]
 
-    if milestone_pool:
-        by_version = sorted(milestone_pool, key=version_tuple)
-        latest = by_version[-1]
-        if version_tuple(latest) != cur:
-            return latest
+    by_version = sorted(pool, key=version_tuple)
+    latest = by_version[-1]
+    if version_tuple(latest) != cur:
+        return latest
     return None
 
 
-def find_newer_release_local():
+def find_newer_release_local(prefer_latest=False):
     if not os.path.isdir(RELEASES_DIR):
         return None, None
 
@@ -309,7 +319,7 @@ def find_newer_release_local():
         if re.match(r'^\d[\d.\-a-zA-Z ]*$', entry):
             releases.append(entry)
 
-    target = _select_update_target(VERSION, releases, exclude=is_version_recently_failed)
+    target = _select_update_target(VERSION, releases, exclude=is_version_recently_failed, prefer_latest=prefer_latest)
     if target:
         return target, os.path.join(RELEASES_DIR, target)
 
@@ -329,7 +339,7 @@ def _fetch_json(url: str, timeout: int):
     return json.loads(data.decode("utf-8-sig", errors="replace"))
 
 
-def find_newer_release_web():
+def find_newer_release_web(prefer_latest=False):
     if not WEB_MANIFEST_URL:
         return None, None
 
@@ -347,7 +357,7 @@ def find_newer_release_web():
     if not versions:
         return None, None
 
-    target = _select_update_target(VERSION, versions, exclude=is_version_recently_failed)
+    target = _select_update_target(VERSION, versions, exclude=is_version_recently_failed, prefer_latest=prefer_latest)
     if not target:
         return None, None
 
@@ -360,7 +370,7 @@ def find_newer_release_web():
     return target, f"{base}/releases/{target}.tar.gz"
 
 
-def find_newer_release_github():
+def find_newer_release_github(prefer_latest=False):
     if not GITHUB_REPO:
         return None, None
 
@@ -393,7 +403,7 @@ def find_newer_release_github():
         if download_url:
             by_version[v] = download_url
 
-    target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed)
+    target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed, prefer_latest=prefer_latest)
     if target and by_version.get(target):
         return target, by_version[target]
 
@@ -505,19 +515,20 @@ def clear_all_failed_markers():
 def choose_update():
     mode = _normalize_update_mode(UPDATE_MODE)
     candidates = []
+    prefer_latest = _read_upgrade_info_flag("extra_deps")
 
     if mode in ("local", "both", "all"):
-        v, path = find_newer_release_local()
+        v, path = find_newer_release_local(prefer_latest=prefer_latest)
         if v and path and not is_version_recently_failed(v):
             candidates.append((v, "local", path))
 
     if mode in ("web", "both", "all"):
-        v, url = find_newer_release_web()
+        v, url = find_newer_release_web(prefer_latest=prefer_latest)
         if v and url and not is_version_recently_failed(v):
             candidates.append((v, "web", url))
 
     if mode in ("github", "all"):
-        v, url = find_newer_release_github()
+        v, url = find_newer_release_github(prefer_latest=prefer_latest)
         if v and url and not is_version_recently_failed(v):
             candidates.append((v, "web", url))
 
