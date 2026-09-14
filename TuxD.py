@@ -19,7 +19,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.28"
+VERSION = "2.0.31"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -326,14 +326,34 @@ def find_newer_release_local(prefer_latest=False):
     return None, None
 
 
+def _github_token():
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        path = Path(__file__).resolve().parent / "github.token"
+        return path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _is_github_url(url: str) -> bool:
+    return "github.com" in url
+
+
 def _fetch_json(url: str, timeout: int):
     sep = '&' if '?' in url else '?'
     url = f"{url}{sep}_={int(time.time())}"
-    req = urllib.request.Request(url, headers={
+    headers = {
         "User-Agent": "TuxD-Updater",
         "Cache-Control": "no-cache",
         "Pragma": "no-cache",
-    })
+    }
+    if _is_github_url(url):
+        token = _github_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         data = resp.read()
     return json.loads(data.decode("utf-8-sig", errors="replace"))
@@ -503,7 +523,12 @@ def choose_update():
 
 
 def _download_to_file(url: str, dest_path: Path, timeout: int):
-    req = urllib.request.Request(url, headers={"User-Agent": "TuxD-Updater"})
+    headers = {"User-Agent": "TuxD-Updater"}
+    if _is_github_url(url):
+        token = _github_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest_path, "wb") as f:
         shutil.copyfileobj(resp, f)
 

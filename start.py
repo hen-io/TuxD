@@ -91,12 +91,30 @@ def _repair_on_cooldown():
     return (time.time() - last) < REPAIR_COOLDOWN_SECONDS
 
 
+def _github_token():
+    token = os.environ.get("GITHUB_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        return (PROJECT_DIR / "github.token").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+
+def _github_headers():
+    headers = {"User-Agent": "TuxD-Updater"}
+    token = _github_token()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 def _find_release(repo, version=None):
     if version:
         for tag in (f"v{version}", version):
             api_url = f"https://api.github.com/repos/{repo}/releases/tags/{tag}"
             try:
-                req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
+                req = urllib.request.Request(api_url, headers=_github_headers())
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     return json.loads(resp.read().decode("utf-8-sig", errors="replace"))
             except Exception:
@@ -104,7 +122,7 @@ def _find_release(repo, version=None):
         return None
 
     api_url = f"https://api.github.com/repos/{repo}/releases/latest"
-    req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
+    req = urllib.request.Request(api_url, headers=_github_headers())
     with urllib.request.urlopen(req, timeout=15) as resp:
         return json.loads(resp.read().decode("utf-8-sig", errors="replace"))
 
@@ -152,7 +170,7 @@ def full_repair(version=None, force=False):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             tar_path = td_path / "release.tar.gz"
-            req = urllib.request.Request(download_url, headers={"User-Agent": "TuxD-Updater"})
+            req = urllib.request.Request(download_url, headers=_github_headers())
             with _Spinner(f"Downloading {found_version or version or 'latest'} (github)"):
                 with urllib.request.urlopen(req, timeout=60) as resp, open(tar_path, "wb") as f:
                     shutil.copyfileobj(resp, f)
