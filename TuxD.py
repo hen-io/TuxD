@@ -19,13 +19,13 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.16"
+VERSION = "2.0.17"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
 LOG_FILE_PATH = "tuxd.log"
 
-UPDATE_MODE = "github"
+UPDATE_MODE = "web"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
