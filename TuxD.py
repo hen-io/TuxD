@@ -19,18 +19,19 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.9"
+VERSION = "2.0.11"
 
 CONFIG_PATH = "config.yaml"
 RELEASES_DIR = "/mnt/storage/tuxd/TuxD/releases"
 LOG_FILE_PATH = "tuxd.log"
 
-UPDATE_MODE = "git"
+UPDATE_MODE = "github"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
 WEB_MANIFEST_URL = "https://updates.k93.rehab:1443/tuxd/manifest.json"
 WEB_TIMEOUT = 8
+DOWNLOAD_TIMEOUT = 60
 
 GITHUB_REPO = "hen-io/TuxD"
 GITHUB_ASSET_SUFFIX = ".tar.gz"
@@ -259,26 +260,43 @@ def print_banner(enabled):
     return lines
 
 
+def _normalize_update_mode(mode) -> str:
+    mode = (mode or "none").lower().strip()
+    aliases = {"git": "github"}
+    return aliases.get(mode, mode)
+
+
 def version_tuple(v: str):
     parts = re.findall(r'\d+', str(v))
     return tuple(int(p) for p in parts) if parts else (0,)
 
 
+def _is_milestone_version(v) -> bool:
+    parts = version_tuple(v)
+    return len(parts) < 3 or parts[2] == 0
+
+
 def _select_update_target(current_version, available_versions, exclude=None):
     exclude = exclude or (lambda v: False)
-    pool = [v for v in available_versions if not exclude(v)]
-    if not pool:
+    excluded_pool = [v for v in available_versions if not exclude(v)]
+    if not excluded_pool:
         return None
 
     cur = version_tuple(current_version)
-    newer = sorted((v for v in pool if version_tuple(v) > cur), key=version_tuple)
-    if newer:
-        return newer[0]
+    milestone_pool = [v for v in excluded_pool if _is_milestone_version(v)]
 
-    by_version = sorted(pool, key=version_tuple)
-    latest = by_version[-1]
-    if version_tuple(latest) != cur:
-        return latest
+    newer_milestones = sorted((v for v in milestone_pool if version_tuple(v) > cur), key=version_tuple)
+    if newer_milestones:
+        return newer_milestones[0]
+
+    if any(version_tuple(v) > cur for v in excluded_pool):
+        return None
+
+    if milestone_pool:
+        by_version = sorted(milestone_pool, key=version_tuple)
+        latest = by_version[-1]
+        if version_tuple(latest) != cur:
+            return latest
     return None
 
 
@@ -383,7 +401,7 @@ def find_newer_release_github():
 
 
 def find_release_by_version(target_version: str):
-    mode = (UPDATE_MODE or "none").lower().strip()
+    mode = _normalize_update_mode(UPDATE_MODE)
     target = version_tuple(target_version)
 
     if mode in ("local", "both", "all") and os.path.isdir(RELEASES_DIR):
@@ -485,7 +503,7 @@ def clear_all_failed_markers():
 
 
 def choose_update():
-    mode = (UPDATE_MODE or "none").lower().strip()
+    mode = _normalize_update_mode(UPDATE_MODE)
     candidates = []
 
     if mode in ("local", "both", "all"):
@@ -734,7 +752,7 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True, 
                 extract_dir = td_path / "extract"
                 extract_dir.mkdir(parents=True, exist_ok=True)
 
-                _download_to_file(source_value, tar_path, timeout=WEB_TIMEOUT)
+                _download_to_file(source_value, tar_path, timeout=DOWNLOAD_TIMEOUT)
                 _extract_tar(tar_path, extract_dir)
 
                 release_root = _find_release_root(extract_dir)

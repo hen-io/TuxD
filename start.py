@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -32,6 +33,49 @@ def log(msg):
             f.write(line + "\n")
     except Exception:
         pass
+
+
+def _isatty():
+    try:
+        return sys.stdout.isatty()
+    except Exception:
+        return False
+
+
+class _Spinner:
+    FRAMES = "|/-\\"
+
+    def __init__(self, label):
+        self.label = label
+        self.enabled = _isatty()
+        self._stop = None
+        self._thread = None
+
+    def __enter__(self):
+        if self.enabled:
+            self._stop = threading.Event()
+            self._thread = threading.Thread(target=self._spin, daemon=True)
+            self._thread.start()
+        else:
+            log(self.label)
+        return self
+
+    def _spin(self):
+        i = 0
+        while not self._stop.is_set():
+            frame = self.FRAMES[i % len(self.FRAMES)]
+            sys.stdout.write(f"\r{self.label} {frame} ")
+            sys.stdout.flush()
+            i += 1
+            time.sleep(0.15)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.enabled and self._stop is not None:
+            self._stop.set()
+            self._thread.join(timeout=1)
+            sys.stdout.write("\r" + " " * (len(self.label) + 4) + "\r")
+            sys.stdout.flush()
+        return False
 
 
 def read_fail_count():
@@ -58,9 +102,10 @@ def clear_fail_count():
 def restore_backup():
     if not BACKUP_DIR.is_dir():
         return False
-    log(f"Restoring pre-update backup from {BACKUP_DIR}...")
+    log(f"Downgrading: restoring pre-update backup from {BACKUP_DIR}...")
     helper = PROJECT_DIR / "bin" / "upgrade" / "restore_backup.py"
-    subprocess.run([sys.executable, str(helper), str(BACKUP_DIR)])
+    with _Spinner("Restoring previous version"):
+        subprocess.run([sys.executable, str(helper), str(BACKUP_DIR)])
     log("Backup restored.")
     return True
 
@@ -108,19 +153,24 @@ def full_repair(force=False):
             log("Full repair: manifest has no download_url - skipping.")
             return False
 
-        log(f"Full repair: fetching {version or 'latest'} from {download_url}...")
+        log(f"Repairing: downloading {version or 'latest'} via web from {download_url}")
 
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             tar_path = td_path / "release.tar.gz"
             req = urllib.request.Request(download_url, headers={"User-Agent": "TuxD-Updater"})
-            with urllib.request.urlopen(req, timeout=60) as resp, open(tar_path, "wb") as f:
-                shutil.copyfileobj(resp, f)
+            with _Spinner(f"Downloading {version or 'latest'} (web)"):
+                with urllib.request.urlopen(req, timeout=60) as resp, open(tar_path, "wb") as f:
+                    shutil.copyfileobj(resp, f)
 
             extract_dir = td_path / "extract"
             extract_dir.mkdir()
-            with tarfile.open(tar_path, "r:gz") as t:
-                t.extractall(extract_dir)
+            with _Spinner("Extracting release"):
+                with tarfile.open(tar_path, "r:gz") as t:
+                    try:
+                        t.extractall(extract_dir, filter="data")
+                    except TypeError:
+                        t.extractall(extract_dir)
 
             release_root = extract_dir
             if not (release_root / "modules").exists():
@@ -132,16 +182,17 @@ def full_repair(force=False):
                 log("Full repair: downloaded release doesn't look valid (no modules/) - aborting.")
                 return False
 
-            for root, _dirs, files in os.walk(release_root):
-                rel = os.path.relpath(root, release_root)
-                dest_root = PROJECT_DIR / rel
-                dest_root.mkdir(parents=True, exist_ok=True)
-                for fn in files:
-                    if fn == "config.yaml":
-                        continue
-                    shutil.copy2(Path(root) / fn, dest_root / fn)
+            with _Spinner("Installing files"):
+                for root, _dirs, files in os.walk(release_root):
+                    rel = os.path.relpath(root, release_root)
+                    dest_root = PROJECT_DIR / rel
+                    dest_root.mkdir(parents=True, exist_ok=True)
+                    for fn in files:
+                        if fn == "config.yaml":
+                            continue
+                        shutil.copy2(Path(root) / fn, dest_root / fn)
 
-        log(f"Full repair complete - {version or 'latest'} installed fresh (config.yaml untouched).")
+        log(f"Full repair complete - {version or 'latest'} installed fresh via web (config.yaml untouched).")
         return True
     except Exception as e:
         log(f"Full repair failed: {e}")
