@@ -110,10 +110,10 @@ def restore_backup():
     return True
 
 
-def _read_web_manifest_url():
+def _read_github_repo():
     try:
         text = (PROJECT_DIR / "TuxD.py").read_text(encoding="utf-8", errors="replace")
-        m = re.search(r'^WEB_MANIFEST_URL\s*=\s*"([^"]*)"', text, re.MULTILINE)
+        m = re.search(r'^GITHUB_REPO\s*=\s*"([^"]*)"', text, re.MULTILINE)
         return m.group(1) if m and m.group(1) else None
     except Exception:
         return None
@@ -137,29 +137,41 @@ def full_repair(force=False):
     except Exception:
         pass
 
-    manifest_url = _read_web_manifest_url()
-    if not manifest_url:
-        log("Full repair: could not find WEB_MANIFEST_URL in TuxD.py - skipping.")
+    repo = _read_github_repo()
+    if not repo:
+        log("Full repair: could not find GITHUB_REPO in TuxD.py - skipping.")
         return False
 
     try:
-        req = urllib.request.Request(manifest_url, headers={"User-Agent": "TuxD-Updater"})
+        api_url = f"https://api.github.com/repos/{repo}/releases/latest"
+        req = urllib.request.Request(api_url, headers={"User-Agent": "TuxD-Updater"})
         with urllib.request.urlopen(req, timeout=15) as resp:
-            manifest = json.loads(resp.read().decode("utf-8-sig", errors="replace"))
+            release = json.loads(resp.read().decode("utf-8-sig", errors="replace"))
 
-        download_url = str(manifest.get("download_url", "")).strip()
-        version = str(manifest.get("latest", "")).strip()
+        version = str(release.get("tag_name", "")).strip()
+        if version[:1] in ("v", "V"):
+            version = version[1:]
+
+        download_url = ""
+        for asset in release.get("assets") or []:
+            name = str(asset.get("name", ""))
+            if name.endswith(".tar.gz"):
+                download_url = str(asset.get("browser_download_url", "")).strip()
+                break
         if not download_url:
-            log("Full repair: manifest has no download_url - skipping.")
+            download_url = str(release.get("tarball_url", "")).strip()
+
+        if not download_url:
+            log("Full repair: release has no usable download - skipping.")
             return False
 
-        log(f"Repairing: downloading {version or 'latest'} via web from {download_url}")
+        log(f"Repairing: downloading {version or 'latest'} via github from {download_url}")
 
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             tar_path = td_path / "release.tar.gz"
             req = urllib.request.Request(download_url, headers={"User-Agent": "TuxD-Updater"})
-            with _Spinner(f"Downloading {version or 'latest'} (web)"):
+            with _Spinner(f"Downloading {version or 'latest'} (github)"):
                 with urllib.request.urlopen(req, timeout=60) as resp, open(tar_path, "wb") as f:
                     shutil.copyfileobj(resp, f)
 
@@ -192,7 +204,7 @@ def full_repair(force=False):
                             continue
                         shutil.copy2(Path(root) / fn, dest_root / fn)
 
-        log(f"Full repair complete - {version or 'latest'} installed fresh via web (config.yaml untouched).")
+        log(f"Full repair complete - {version or 'latest'} installed fresh via github (config.yaml untouched).")
         return True
     except Exception as e:
         log(f"Full repair failed: {e}")
