@@ -108,6 +108,8 @@ class LagMonitorMixin:
 
                     self.publish(f"{base}/high_latency", "ON" if compare > threshold else "OFF")
                     samples.clear()
+                else:
+                    self.publish(f"{base}/high_latency", "ON")
                 last_sensor_publish = now
 
             self._stop_event.wait(timeout=interval)

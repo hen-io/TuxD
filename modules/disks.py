@@ -10,7 +10,7 @@ def read_diskstats(dev):
                     read_sectors = int(parts[5])
                     write_sectors = int(parts[9])
                     return read_sectors * 512, write_sectors * 512
-    except:
+    except Exception:
         pass
 
     return 0, 0
@@ -31,7 +31,7 @@ def disk_space(mount):
             "free_gb": free_gb,
             "used_pct": used_pct,
         }
-    except:
+    except Exception:
         return {
             "used_gb": 0,
             "free_gb": 0,
@@ -45,7 +45,8 @@ def smart_errors(dev_path):
         result = subprocess.run(
             ["smartctl", "-A", dev_path],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=15,
         )
 
         if result.returncode != 0:
@@ -65,5 +66,5 @@ def smart_errors(dev_path):
 
         return errors
 
-    except:
+    except Exception:
         return 0

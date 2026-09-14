@@ -1,10 +1,9 @@
 import json
 import os
-import re
 import threading
 import time
 
-from .base import run_cmd
+from .base import run_cmd, slugify as _slug
 from modules.docker_monitor import (
     compose_containers,
     inspect_containers,
@@ -13,12 +12,6 @@ from modules.docker_monitor import (
     local_image_digest,
     remote_image_digest,
 )
-
-
-def _slug(s):
-    s = str(s).lower()
-    s = re.sub(r"[^a-z0-9]+", "_", s)
-    return s.strip("_")
 
 
 def _short_digest(digest):

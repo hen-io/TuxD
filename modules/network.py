@@ -13,7 +13,7 @@ class NetworkMonitor:
         try:
             with open(path) as f:
                 return int(f.read().strip())
-        except:
+        except Exception:
             return 0
 
     def _read_state(self):
@@ -21,7 +21,7 @@ class NetworkMonitor:
         try:
             with open(operstate) as f:
                 return f.read().strip()
-        except:
+        except Exception:
             return "down"
 
     def sample(self):

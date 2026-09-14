@@ -10,7 +10,8 @@ def read_lm_sensors(flat_overrides=None, include=None):
         result = subprocess.run(
             ["sensors", "-j"],
             capture_output=True,
-            text=True
+            text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             return {}

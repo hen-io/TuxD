@@ -1,17 +1,12 @@
 import os
 import sys
 import json
-import re
 import yaml
 import threading
 import time
 import datetime
 
-
-def _slug(s: str) -> str:
-    s = str(s).lower()
-    s = re.sub(r"[^a-z0-9]+", "_", s)
-    return s.strip("_")
+from .base import slugify as _slug
 
 
 _FLOAT_OPTS = {"min": 0.1, "max": 86400.0, "step": 0.1}
