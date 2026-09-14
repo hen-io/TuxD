@@ -1,29 +1,21 @@
-```
-  ________  ___  __ ____ 
- /_  __/ / / / |/ // __ \
-  / / / / / /|   // / / /
- / / / /_/ //   |/ /_/ / 
-/_/  \____//_/|_/_____/  
-                         
-```
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="bin/logo.png">
-    <img src="bin/logo.png" alt="TuxD" height="300em">
-  </picture>
-</p>
+![TuXD](https://raw.githubusercontent.com/hen-io/TuxD/refs/heads/main/bin/banner.png)
+## 
 
-### A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.
+**<center> A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.</center>**
+
+This readme is still very much a WIP
 
 
+## Features
+* Monitor resourceusage, applications and anything you want on your *nix system!
+* Actions as buttons in Home Assistant - Run commands or script with ease!
+* Live terminal: Terminal input with TTY output in Home Assistant(in enabled, see Security section*)
+* LM-Sensors integration - Monitor your hardware
+* Docker integration - Monitor your container and available updates to images you updates
+* Much more!
 
-### This readme is very much a WIP...
 
-Features:
-* 
-
-
-Dependencies:
+## Dependencies
 * python3
 * python3-pip
 * python3-paho-mqtt
@@ -32,3 +24,7 @@ Dependencies:
 * lm-sensors
 * skopeo (required for the docker module)
 
+
+## Authors
+
+- [@hen-io](https://www.github.com/hen-io)
