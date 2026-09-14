@@ -60,7 +60,7 @@ class RestartMixin:
                 except Exception:
                     pass
             self.clear_discovery(timeout=5.0)
-            time.sleep(5.0)
+            time.sleep(15.0)
             os.execv(sys.executable, [sys.executable] + sys.argv)
 
         threading.Thread(target=_refresh, daemon=True).start()
