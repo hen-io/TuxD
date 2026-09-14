@@ -96,8 +96,8 @@ class SelectMixin:
 
         cmd = (matched_opt.get("cmd") or "").strip()
         if cmd:
-            def _run(c=cmd, wtt=write_to_terminal):
-                with self.busy():
+            def _run(c=cmd, wtt=write_to_terminal, n=name, sel=selected_name):
+                with self.busy(f"select: {n} -> {sel}"):
                     output = run_cmd(c)
                 if wtt and output and self._terminal_output_enabled():
                     for line in output.split("\n"):

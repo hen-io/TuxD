@@ -239,4 +239,8 @@ if __name__ == "__main__":
         log(f"Manual fix requested (--fix{' ' + target_version if target_version else ''})...")
         sys.exit(0 if full_repair(version=target_version, force=True) else 1)
 
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        log("Interrupted - shutting down.")
+        sys.exit(130)

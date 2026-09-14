@@ -193,7 +193,7 @@ class HostUpdateMixin:
         except Exception:
             pass
         try:
-            with self.busy():
+            with self.busy("host update"):
                 out = run_cmd(cmd)
             if self._terminal_output_enabled() and out:
                 for line in out.splitlines():

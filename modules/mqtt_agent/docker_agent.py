@@ -462,7 +462,8 @@ class DockerMixin:
         base = f"{self.base_topic}/docker"
         self._set_docker_image_progress(base, slug, True)
         try:
-            out = run_cmd(cmd)
+            with self.busy(f"docker update: {ref or slug}"):
+                out = run_cmd(cmd)
             if self._terminal_output_enabled() and out:
                 for line in out.splitlines():
                     if line:

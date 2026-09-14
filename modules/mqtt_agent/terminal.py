@@ -93,7 +93,7 @@ class TerminalMixin:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"$ {cmd}")
 
-            with self.busy():
+            with self.busy(f"terminal: {cmd}"):
                 output = run_cmd(cmd)
             lines = output.split("\n") if output else [""]
 

@@ -80,8 +80,8 @@ class CustomEntitiesMixin:
                     except Exception:
                         pass
                 if write_to_terminal:
-                    def _run(c=cmd):
-                        with self.busy():
+                    def _run(c=cmd, n=b["name"]):
+                        with self.busy(f"button: {n}"):
                             output = run_cmd(c)
                         if output and self._terminal_output_enabled():
                             for line in output.split("\n"):
@@ -89,8 +89,8 @@ class CustomEntitiesMixin:
                                     self.publish(self.terminal_output_topic, line)
                     threading.Thread(target=_run, daemon=True).start()
                 else:
-                    def _run_quiet(c=cmd):
-                        with self.busy():
+                    def _run_quiet(c=cmd, n=b["name"]):
+                        with self.busy(f"button: {n}"):
                             run_cmd(c)
                     threading.Thread(target=_run_quiet, daemon=True).start()
                 return

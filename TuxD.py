@@ -14,12 +14,11 @@ import json
 import tempfile
 import tarfile
 import urllib.request
-import urllib.error
 import ast
 import datetime
 import re
 
-VERSION = "2.0.45"
+VERSION = "2.0.46"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -600,12 +599,8 @@ def _safe_replace(src: Path, dest: Path) -> None:
 
 
 class _Rollback:
-    def __init__(self, backup_dir=None):
-        if backup_dir is not None:
-            self.backup_dir = Path(backup_dir)
-            self.backup_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            self.backup_dir = Path(tempfile.mkdtemp(prefix="tuxd-backup-"))
+    def __init__(self):
+        self.backup_dir = Path(tempfile.mkdtemp(prefix="tuxd-backup-"))
         self.map = {}
         self.created = []
 
@@ -1160,13 +1155,12 @@ def main():
         sys.exit(EXIT_CONFIG_ERROR)
 
     device_cfg = (cfg or {}).get("device", {}) or {}
-    tty_output = bool(device_cfg.get("tty_output", False))
     log_to_file = bool(device_cfg.get("log_to_file", False))
     log_level = str(device_cfg.get("log_level", "all")).lower().strip()
     if log_level not in ("all", "error"):
         log_level = "all"
     retry_delay = int(((cfg or {}).get("mqtt") or {}).get("retry_delay", 30))
-    enabled = tty_output and _isatty()
+    enabled = _isatty()
     _TTY_ENABLED = enabled
 
     if log_to_file:

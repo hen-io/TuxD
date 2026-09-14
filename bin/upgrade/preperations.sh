@@ -70,6 +70,26 @@ scu() {
     fi
 }
 
+install_system_unit() {
+    log "$1"
+    sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | $SUDO tee /etc/systemd/system/tuxd.service > /dev/null
+    $SUDO systemctl daemon-reload
+    $SUDO systemctl enable tuxd.service
+    $SUDO systemctl restart tuxd.service
+    log "$2"
+}
+
+install_user_unit() {
+    log "$1"
+    run_as_target mkdir -p "$USER_SERVICE_DIR"
+    sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | run_as_target tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
+    scu daemon-reload
+    scu enable tuxd.service
+    scu restart tuxd.service
+    $SUDO loginctl enable-linger "$TARGET_USER" 2>/dev/null || true
+    log "$2"
+}
+
 
 if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_DIR_NAME,,}" == "k93sys" ]]; then
 
@@ -232,21 +252,13 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
         fi
 
         if [[ "$FORCE_SYSTEM" -eq 1 ]]; then
-            log "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..."
-            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | $SUDO tee /etc/systemd/system/tuxd.service > /dev/null
-            $SUDO systemctl daemon-reload
-            $SUDO systemctl enable tuxd.service
-            $SUDO systemctl restart tuxd.service
-            log "System service tuxd.service created and started."
+            install_system_unit \
+                "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..." \
+                "System service tuxd.service created and started."
         else
-            log "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..."
-            run_as_target mkdir -p "$USER_SERVICE_DIR"
-            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | run_as_target tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
-            scu daemon-reload
-            scu enable tuxd.service
-            scu restart tuxd.service
-            $SUDO loginctl enable-linger "$TARGET_USER" 2>/dev/null || true
-            log "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
+            install_user_unit \
+                "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..." \
+                "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
         fi
 
         trap - ERR
@@ -267,21 +279,13 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
             fi
 
             if [[ "$FORCE_USER" -ne 1 && ( "$FORCE_SYSTEM" -eq 1 || "$TARGET_USER" == "root" ) ]]; then
-                log "No systemd service found at all - installing tuxd.service fresh (system scope)..."
-                sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | $SUDO tee /etc/systemd/system/tuxd.service > /dev/null
-                $SUDO systemctl daemon-reload
-                $SUDO systemctl enable tuxd.service
-                $SUDO systemctl restart tuxd.service
-                log "System service tuxd.service created and started."
+                install_system_unit \
+                    "No systemd service found at all - installing tuxd.service fresh (system scope)..." \
+                    "System service tuxd.service created and started."
             else
-                log "No systemd service found at all - installing tuxd.service fresh (user scope: ${TARGET_USER})..."
-                run_as_target mkdir -p "$USER_SERVICE_DIR"
-                sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | run_as_target tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
-                scu daemon-reload
-                scu enable tuxd.service
-                scu restart tuxd.service
-                $SUDO loginctl enable-linger "$TARGET_USER" 2>/dev/null || true
-                log "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
+                install_user_unit \
+                    "No systemd service found at all - installing tuxd.service fresh (user scope: ${TARGET_USER})..." \
+                    "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
             fi
         fi
 
@@ -349,14 +353,9 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
                 $SUDO rm -f "$USER_UNIT"
             fi
 
-            log "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..."
-            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
-                | run_as_target tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
-
-            scu daemon-reload
-            scu enable tuxd.service
-            scu restart tuxd.service
-            log "User service converted and restarted as tuxd.service (user: ${TARGET_USER})."
+            install_user_unit \
+                "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..." \
+                "User service converted and restarted as tuxd.service (user: ${TARGET_USER})."
         fi
 
         if [[ "$CONVERT_SYSTEM" -eq 1 ]]; then
@@ -369,14 +368,9 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
                 $SUDO rm -f "$SYSTEM_UNIT"
             fi
 
-            log "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..."
-            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" \
-                | $SUDO tee /etc/systemd/system/tuxd.service > /dev/null
-
-            $SUDO systemctl daemon-reload
-            $SUDO systemctl enable tuxd.service
-            $SUDO systemctl restart tuxd.service
-            log "System service converted and restarted as tuxd.service."
+            install_system_unit \
+                "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..." \
+                "System service converted and restarted as tuxd.service."
         fi
 
         trap - ERR
