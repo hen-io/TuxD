@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "2.0.48"
+VERSION = "2.0.49"
 
 CONFIG_PATH = "tuxd.conf"
 RELEASES_DIR = "/mnt/storage/k93sys/Py-K93SYS/WEB/tuxd/releases"
@@ -1076,29 +1076,6 @@ def _signal_handler(signum, frame):
     raise SystemExit(0)
 
 
-def _migrate_legacy_folder_name():
-    project_root = Path(__file__).resolve().parent
-    if project_root.name.lower() != "py-k93sys":
-        return
-
-    new_root = project_root.parent / "TuxD"
-    if new_root.exists():
-        return
-
-    try:
-        os.rename(str(project_root), str(new_root))
-    except Exception:
-        return
-
-    new_script = new_root / "TuxD.py"
-    try:
-        os.chdir(str(new_root))
-    except Exception:
-        pass
-
-    os.execv(sys.executable, [sys.executable, str(new_script)] + sys.argv[1:])
-
-
 def _migrate_legacy_config_name():
     old_path = Path("config.yaml")
     new_path = Path(CONFIG_PATH)
@@ -1123,7 +1100,6 @@ def _migrate_legacy_config_name():
 def main():
     global _TTY_ENABLED, _LOG_FILE, _LOG_ROTATE_THREAD, _STATUS, _AGENT
 
-    _migrate_legacy_folder_name()
     _migrate_legacy_config_name()
 
     _db = _db_read()
@@ -1215,8 +1191,11 @@ def main():
                     _write_update_status("Update available")
                     status.write(c("Update skipped.", YELLOW))
                     time.sleep(1)
-            else:
+            elif bool(device_cfg.get("self_update_allow_install", True)):
                 safe_apply_update_any(new_version, src_type, src_val, enabled=False)
+            else:
+                _write_update_status("Update available")
+                log_write(f"Update {new_version} available but self_update_allow_install is false - not installing.")
         else:
             _write_update_status("Up to date")
             if enabled:
