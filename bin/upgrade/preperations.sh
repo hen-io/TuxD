@@ -3,6 +3,13 @@
 
 set -eo pipefail
 
+FORCE_SYSTEM=0
+FORCE_USER=0
+for arg in "$@"; do
+    [[ "$arg" == "--system" ]] && FORCE_SYSTEM=1
+    [[ "$arg" == "--user" ]] && FORCE_USER=1
+done
+
 
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SELF_DIR}/../.." && pwd)"
@@ -130,8 +137,15 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
         log "Already named TuxD, nothing to rename."
         NEW_DIR="$PROJECT_DIR"
     elif [[ -e "$NEW_DIR" ]]; then
-        log_err "ERROR: ${NEW_DIR} already exists, refusing to overwrite it."
-        false
+        if [[ -d "$NEW_DIR" && -z "$(ls -A "$NEW_DIR" 2>/dev/null)" ]]; then
+            log "${NEW_DIR} exists but is empty - removing it before the move..."
+            sudo rmdir "$NEW_DIR"
+            log "Renaming ${PROJECT_DIR} -> ${NEW_DIR}..."
+            sudo mv "$PROJECT_DIR" "$NEW_DIR"
+        else
+            log_err "ERROR: ${NEW_DIR} already exists and is not empty, refusing to overwrite it."
+            false
+        fi
     else
         log "Renaming ${PROJECT_DIR} -> ${NEW_DIR}..."
         sudo mv "$PROJECT_DIR" "$NEW_DIR"
@@ -172,8 +186,84 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
         SYSTEM_UNIT="/etc/systemd/system/tuxd.service"
     fi
 
-    if [[ -z "$USER_UNIT" && -z "$SYSTEM_UNIT" ]]; then
-        log "No legacy or stale systemd unit found - nothing to convert there."
+    if [[ "$FORCE_SYSTEM" -eq 1 || "$FORCE_USER" -eq 1 ]]; then
+        log "Explicit scope requested (--$([[ "$FORCE_SYSTEM" -eq 1 ]] && echo system || echo user)) - removing all old tuxd/py-k93sys services in both scopes..."
+
+        for name in py-k93sys k93sys tuxd; do
+            if [[ -f "${USER_SERVICE_DIR}/${name}.service" ]]; then
+                scu stop "${name}.service" 2>/dev/null || true
+                scu disable "${name}.service" 2>/dev/null || true
+                sudo rm -f "${USER_SERVICE_DIR}/${name}.service"
+            fi
+            if [[ -f "/etc/systemd/system/${name}.service" ]]; then
+                sudo systemctl stop "${name}.service" 2>/dev/null || true
+                sudo systemctl disable "${name}.service" 2>/dev/null || true
+                sudo rm -f "/etc/systemd/system/${name}.service"
+            fi
+        done
+        scu daemon-reload 2>/dev/null || true
+        sudo systemctl daemon-reload 2>/dev/null || true
+
+        TEMPLATE_UNIT="${NEW_DIR}/bin/upgrade/tuxd.service"
+        if [[ ! -f "$TEMPLATE_UNIT" ]]; then
+            log_err "ERROR: template unit not found at ${TEMPLATE_UNIT}."
+            false
+        fi
+
+        if [[ "$FORCE_SYSTEM" -eq 1 ]]; then
+            log "Installing /etc/systemd/system/tuxd.service from template, pointed at ${NEW_DIR}..."
+            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | sudo tee /etc/systemd/system/tuxd.service > /dev/null
+            sudo systemctl daemon-reload
+            sudo systemctl enable tuxd.service
+            sudo systemctl restart tuxd.service
+            log "System service tuxd.service created and started."
+        else
+            log "Installing ${USER_SERVICE_DIR}/tuxd.service from template, pointed at ${NEW_DIR}..."
+            sudo -u "$TARGET_USER" mkdir -p "$USER_SERVICE_DIR"
+            sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | sudo -u "$TARGET_USER" tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
+            scu daemon-reload
+            scu enable tuxd.service
+            scu restart tuxd.service
+            sudo loginctl enable-linger "$TARGET_USER" 2>/dev/null || true
+            log "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
+        fi
+
+        trap - ERR
+        sudo rm -rf "$BACKUP_ROOT"
+        log "Done. TuxD now lives at: ${NEW_DIR}"
+    elif [[ -z "$USER_UNIT" && -z "$SYSTEM_UNIT" ]]; then
+        HAVE_CURRENT_UNIT=0
+        [[ -f "${USER_SERVICE_DIR}/tuxd.service" ]] && grep -q 'start\.py' "${USER_SERVICE_DIR}/tuxd.service" && HAVE_CURRENT_UNIT=1
+        [[ -f "/etc/systemd/system/tuxd.service" ]] && sudo grep -q 'start\.py' "/etc/systemd/system/tuxd.service" && HAVE_CURRENT_UNIT=1
+
+        if [[ "$HAVE_CURRENT_UNIT" -eq 1 ]]; then
+            log "A current tuxd.service already exists - nothing to convert or create."
+        else
+            TEMPLATE_UNIT="${NEW_DIR}/bin/upgrade/tuxd.service"
+            if [[ ! -f "$TEMPLATE_UNIT" ]]; then
+                log_err "ERROR: template unit not found at ${TEMPLATE_UNIT}."
+                false
+            fi
+
+            if [[ "$FORCE_USER" -ne 1 && ( "$FORCE_SYSTEM" -eq 1 || "$TARGET_USER" == "root" ) ]]; then
+                log "No systemd service found at all - installing tuxd.service fresh (system scope)..."
+                sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | sudo tee /etc/systemd/system/tuxd.service > /dev/null
+                sudo systemctl daemon-reload
+                sudo systemctl enable tuxd.service
+                sudo systemctl restart tuxd.service
+                log "System service tuxd.service created and started."
+            else
+                log "No systemd service found at all - installing tuxd.service fresh (user scope: ${TARGET_USER})..."
+                sudo -u "$TARGET_USER" mkdir -p "$USER_SERVICE_DIR"
+                sed "s#/home/henrik/TuxD#${NEW_DIR}#g" "$TEMPLATE_UNIT" | sudo -u "$TARGET_USER" tee "${USER_SERVICE_DIR}/tuxd.service" > /dev/null
+                scu daemon-reload
+                scu enable tuxd.service
+                scu restart tuxd.service
+                sudo loginctl enable-linger "$TARGET_USER" 2>/dev/null || true
+                log "User service tuxd.service created and started (user: ${TARGET_USER}, linger enabled so it survives logout/reboot)."
+            fi
+        fi
+
         trap - ERR
         sudo rm -rf "$BACKUP_ROOT"
         log "Done. TuxD now lives at: ${NEW_DIR}"
@@ -271,5 +361,26 @@ if [[ "$OLD_DIR_NAME" == "TuxD" || "${OLD_DIR_NAME,,}" == "py-k93sys" || "${OLD_
         trap - ERR
         sudo rm -rf "$BACKUP_ROOT"
         log "Done. TuxD now lives at: ${NEW_DIR}"
+    fi
+
+    FINAL_USER_HAS=0
+    [[ -f "${USER_SERVICE_DIR}/tuxd.service" ]] && FINAL_USER_HAS=1
+    FINAL_SYSTEM_HAS=0
+    [[ -f "/etc/systemd/system/tuxd.service" ]] && FINAL_SYSTEM_HAS=1
+
+    if [[ "$FINAL_USER_HAS" -eq 1 && "$FINAL_SYSTEM_HAS" -eq 1 ]]; then
+        if [[ "$FORCE_SYSTEM" -eq 1 ]]; then
+            log "tuxd.service exists in both scopes - keeping system scope, removing user scope..."
+            scu stop tuxd.service 2>/dev/null || true
+            scu disable tuxd.service 2>/dev/null || true
+            sudo rm -f "${USER_SERVICE_DIR}/tuxd.service"
+            scu daemon-reload 2>/dev/null || true
+        else
+            log "tuxd.service exists in both scopes - keeping user scope, removing system scope..."
+            sudo systemctl stop tuxd.service 2>/dev/null || true
+            sudo systemctl disable tuxd.service 2>/dev/null || true
+            sudo rm -f /etc/systemd/system/tuxd.service
+            sudo systemctl daemon-reload 2>/dev/null || true
+        fi
     fi
 fi
