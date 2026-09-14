@@ -11,14 +11,19 @@ PARENT_DIR="$(dirname "$PROJECT_DIR")"
 NEW_DIR="${PARENT_DIR}/TuxD"
 CURRENT_DIR="$PROJECT_DIR"
 
+if [[ -d "${PROJECT_DIR}/MASTER" || -d "${PROJECT_DIR}/Build" || -f "${PROJECT_DIR}/make.ps1" ]]; then
+    echo "ERROR: ${PROJECT_DIR} looks like the dev/build repo, not a per-host install." >&2
+    echo "Refusing to run preperations.sh here - run it from the actual runtime" >&2
+    echo "install directory on this host instead (e.g. ~/TuxD)." >&2
+    exit 1
+fi
+
 TARGET_USER="$(stat -c '%U' "$PROJECT_DIR" 2>/dev/null || echo root)"
 TARGET_UID="$(id -u "$TARGET_USER" 2>/dev/null || echo 0)"
 TARGET_HOME="$(getent passwd "$TARGET_USER" 2>/dev/null | cut -d: -f6)" || true
 TARGET_HOME="${TARGET_HOME:-/root}"
 USER_SERVICE_DIR="${TARGET_HOME}/.config/systemd/user"
 
-
-touch "hiotest.hmmm"
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
