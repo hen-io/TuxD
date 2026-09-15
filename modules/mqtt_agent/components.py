@@ -86,6 +86,15 @@ class ComponentSensorsMixin:
         )
         self.publish(f"{self.base_topic}/startup_time", self._startup_time, retain=True)
 
+        self._sensor_discovery(
+            "mqtt_base_topic",
+            "MQTT Base Topic",
+            f"{self.base_topic}/mqtt_base_topic",
+            icon="mdi:folder-network",
+            entity_category="config"
+        )
+        self.publish(f"{self.base_topic}/mqtt_base_topic", self.base_topic, retain=True)
+
         if cfg.get("system_load", {}).get("enabled", True):
             self._sensor_discovery(
                 "load_avg_1m",

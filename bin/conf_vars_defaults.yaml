@@ -190,6 +190,37 @@ terminal:
   terminal_input:
     enabled: true
     input_queue_limit: 25
+    command_filter:
+      # mode: off | blacklist | allowlist - ships "off" so the recommended
+      # blacklist below is available but inactive until you opt in. A
+      # command is matched as a whole (whitespace-collapsed, case-insensitive)
+      # against each entry - blacklist entries match anywhere in the command
+      # (so "ls; rm -rf /" is still caught), allowlist entries match only
+      # as a prefix (so this is a safety net against mistakes, not a
+      # sandbox - a trusted prefix with something chained after it still runs).
+      mode: "off"
+      blacklist:
+        - "rm -rf /"
+        - "mkfs"
+        - "dd if=/dev/zero"
+        - "dd if=/dev/random"
+        - ":(){ :|:& };:"
+        - "shutdown"
+        - "reboot"
+        - "poweroff"
+        - "halt"
+        - "> /dev/sda"
+        - "chmod -r 777 /"
+        - "chown -r / "
+        - "curl | bash"
+        - "curl | sh"
+        - "wget | bash"
+        - "wget | sh"
+        - "passwd"
+        - "userdel"
+        - "> /etc/passwd"
+        - "> /etc/shadow"
+      allowlist: []
   terminal_output:
     enabled: true
     max_queue: 50

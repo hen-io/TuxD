@@ -24,6 +24,31 @@ class TerminalMixin:
             return True
         return bool(self._terminal_output_cfg().get("enabled", True))
 
+    def _cmd_filter_cfg(self):
+        val = self._terminal_input_cfg().get("command_filter", {})
+        return val if isinstance(val, dict) else {}
+
+    def _cmd_allowed(self, cmd):
+        cfg = self._cmd_filter_cfg()
+        mode = str(cfg.get("mode", "off")).strip().lower()
+        if mode not in ("blacklist", "allowlist"):
+            return True, None
+
+        normalized = " ".join(cmd.lower().split())
+
+        if mode == "blacklist":
+            for pattern in (cfg.get("blacklist") or []):
+                needle = " ".join(str(pattern).lower().split())
+                if needle and needle in normalized:
+                    return False, f"blocked by command blacklist rule: {pattern}"
+            return True, None
+
+        for pattern in (cfg.get("allowlist") or []):
+            prefix = " ".join(str(pattern).lower().split())
+            if prefix and normalized.startswith(prefix):
+                return True, None
+        return False, "command not in allowlist"
+
     def init_terminal(self):
         self.terminal_input_topic = f"{self.base_topic}/terminal_input"
         self.terminal_output_topic = f"{self.base_topic}/terminal_output"
@@ -55,6 +80,14 @@ class TerminalMixin:
     def handle_terminal_message(self, payload: str):
         cmd = (payload or "").strip()
         if not cmd:
+            return
+
+        allowed, reason = self._cmd_allowed(cmd)
+        if not allowed:
+            if self._terminal_output_enabled():
+                self.publish(self.terminal_output_topic, f"$ {cmd}")
+                self.publish(self.terminal_output_topic, f"[{reason}]")
+            self.publish(self.terminal_input_topic, "")
             return
 
         limit = int(self._terminal_input_cfg().get("input_queue_limit", 25))
