@@ -64,8 +64,8 @@ class SelfUpdateMixin:
         }
         if new_version and src_type:
             summary = (release_notes or {}).get("summary") or ""
-            if len(summary) > 500:
-                summary = summary[:500].rstrip() + "..."
+            if len(summary) > 4000:
+                summary = summary[:4000].rstrip() + "..."
             state["release_summary"] = summary or f"{new_version} available via the {src_type} update source."
             release_url = (release_notes or {}).get("url")
             if release_url:

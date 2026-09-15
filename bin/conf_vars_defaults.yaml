@@ -33,6 +33,7 @@ device:
   discovery_settle_delay: 2.0
   self_update_check_interval: 3600
   self_update_allow_install: true
+  extra_config_path: ""
 
 #################################
 # Components                    #

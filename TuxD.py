@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.58"
+VERSION = "1.0.59"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -372,8 +372,17 @@ def find_newer_release_github(prefer_latest=False):
 
     target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed, prefer_latest=prefer_latest)
     if target and by_version.get(target):
-        download_url, notes, html_url = by_version[target]
-        release_notes = {"summary": notes, "url": html_url} if (notes or html_url) else None
+        download_url, _, target_html_url = by_version[target]
+
+        cur_v = version_tuple(VERSION)
+        newer = [v for v in by_version if version_tuple(v) > cur_v]
+        newer.sort(key=version_tuple, reverse=True)
+
+        chunks = [f"{v}\n{by_version[v][1]}" for v in newer if by_version[v][1]]
+        summary = "\n\n".join(chunks)
+        release_url = by_version[newer[0]][2] if newer else target_html_url
+
+        release_notes = {"summary": summary, "url": release_url} if (summary or release_url) else None
         return target, download_url, release_notes
 
     return None, None, None
@@ -1052,10 +1061,20 @@ def main():
         pass
 
     try:
-        cfg = yaml.safe_load(Path(CONFIG_PATH).read_text(encoding="utf-8"))
+        cfg = yaml.safe_load(Path(CONFIG_PATH).read_text(encoding="utf-8")) or {}
     except Exception as e:
         print(c(f"Failed to load configuration ({CONFIG_PATH}): {e}", RED, BOLD))
         sys.exit(EXIT_CONFIG_ERROR)
+
+    extra_config_path = (cfg.get("device") or {}).get("extra_config_path", "")
+    if extra_config_path:
+        try:
+            extra_cfg = yaml.safe_load(Path(extra_config_path).read_text(encoding="utf-8")) or {}
+            if isinstance(extra_cfg, dict):
+                from modules.config_sync import _deep_merge_defaults
+                _deep_merge_defaults(cfg, extra_cfg)
+        except Exception as e:
+            log_write(f"Failed to load extra config ({extra_config_path}): {e}")
 
     device_cfg = (cfg or {}).get("device", {}) or {}
     log_to_file = bool(device_cfg.get("log_to_file", False))

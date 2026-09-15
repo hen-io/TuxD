@@ -49,7 +49,7 @@ class NetworkMixin:
                     state_class="measurement"
                 )
 
-        if len(self.config.get("network") or []) < 2:
+        if not self.config.get("network"):
             return
 
         self._sensor_discovery(
