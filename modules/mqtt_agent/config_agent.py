@@ -313,6 +313,15 @@ class ConfigAgentMixin:
                 "path_info": path_info,
             }
 
+        device = cfg.get("device") or {}
+        if "extra_config_path" in device:
+            add(
+                "device_extra_config_path",
+                "Extra Config Path",
+                device["extra_config_path"],
+                {"type": "dict", "keys": ["device", "extra_config_path"]},
+            )
+
         hup = cfg.get("host_update") or {}
         if "install_button_name" in hup:
             add(
