@@ -80,7 +80,7 @@ class TerminalMixin:
 
         out_cfg = self._terminal_output_cfg()
         max_queue = int(out_cfg.get("max_queue", 50))
-        post_interval = float(out_cfg.get("post_interval", 0.1))
+        post_interval = float(out_cfg.get("post_interval", 0.25))
 
         while not self._stop_event.is_set():
             cmd = None

@@ -192,7 +192,7 @@ terminal:
   terminal_output:
     enabled: true
     max_queue: 50
-    post_interval: 1.0
+    post_interval: 0.25
 
 #################################
 # Commands                      #
