@@ -194,79 +194,81 @@ terminal:
     enabled: true
     max_queue: 50
     post_interval: 0.25
+    max_runtime: 60
 
 #################################
 # Commands                      #
 #################################
 
-commands:
-  status:
-    updates_available:
-      enabled: true
-      update_interval: 3600
-      cmd: sudo apt list --upgradable 2>/dev/null | grep -c 'upgradable'
-      name: ""
-      suffix: ""
-      icon: ""
-      device_class: ""
-    uptime_seconds:
-      enabled: false
-      update_interval: 60
-      cmd: ""
-      name: ""
-      suffix: ""
-      icon: ""
-      device_class: ""
-    up_time:
-      enabled: false
-      update_interval: 60
-      cmd: ""
-      name: ""
-      suffix: ""
-      icon: ""
-      device_class: ""
-    kernel_version:
-      enabled: false
-      update_interval: 3600
-      cmd: ""
-      name: ""
-      suffix: ""
-    hostname:
-      enabled: false
-      update_interval: 3600
-      cmd: ""
-      name: ""
-      suffix: ""
-    cpu_name:
-      enabled: false
-      update_interval: 3600
-      cmd: ""
-      name: ""
-      suffix: ""
-    public_ip:
-      enabled: false
-      update_interval: 600
-      cmd: ""
-      name: ""
-      suffix: ""
-    processes:
-      enabled: false
-      update_interval: 60
-      cmd: ""
-      name: ""
-      suffix: ""
-    kvm_vms:
-      enabled: false
-      update_interval: 5
-      cmd: ""
-      name: ""
-      suffix: ""
-    lxc_containers:
-      enabled: false
-      update_interval: 30
-      cmd: ""
-      name: ""
-      suffix: ""
+commands: []
+
+  # status:
+  #   updates_available:
+  #     enabled: true
+  #     update_interval: 3600
+  #     cmd: sudo apt list --upgradable 2>/dev/null | grep -c 'upgradable'
+  #     name: ""
+  #     suffix: ""
+  #     icon: ""
+  #     device_class: ""
+  #   uptime_seconds:
+  #     enabled: false
+  #     update_interval: 60
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #     icon: ""
+  #     device_class: ""
+  #   up_time:
+  #     enabled: false
+  #     update_interval: 60
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #     icon: ""
+  #     device_class: ""
+  #   kernel_version:
+  #     enabled: false
+  #     update_interval: 3600
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   hostname:
+  #     enabled: false
+  #     update_interval: 3600
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   cpu_name:
+  #     enabled: false
+  #     update_interval: 3600
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   public_ip:
+  #     enabled: false
+  #     update_interval: 600
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   processes:
+  #     enabled: false
+  #     update_interval: 60
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   kvm_vms:
+  #     enabled: false
+  #     update_interval: 5
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
+  #   lxc_containers:
+  #     enabled: false
+  #     update_interval: 30
+  #     cmd: ""
+  #     name: ""
+  #     suffix: ""
 
 #################################
 # Custom sensors                #

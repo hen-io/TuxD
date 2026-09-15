@@ -1,6 +1,7 @@
+import subprocess
 import threading
+import time
 from collections import deque
-from .base import run_cmd
 
 
 class TerminalMixin:
@@ -74,6 +75,49 @@ class TerminalMixin:
 
         self.publish(self.terminal_input_topic, "")
 
+    def _stream_cmd(self, cmd, on_line, timeout):
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                shell=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except Exception as e:
+            on_line(f"ERR: {e}")
+            return
+
+        start = time.monotonic()
+        timed_out = False
+        try:
+            for line in proc.stdout:
+                if self._stop_event.is_set():
+                    break
+                if not on_line(line.rstrip("\n")):
+                    break
+                if time.monotonic() - start > timeout:
+                    timed_out = True
+                    break
+        finally:
+            if proc.poll() is None:
+                try:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                except Exception:
+                    pass
+            try:
+                proc.stdout.close()
+            except Exception:
+                pass
+
+        if timed_out:
+            on_line(f"[stopped after {int(timeout)}s]")
+
     def terminal_loop(self):
         if not self._terminal_input_enabled():
             return
@@ -81,6 +125,7 @@ class TerminalMixin:
         out_cfg = self._terminal_output_cfg()
         max_queue = int(out_cfg.get("max_queue", 50))
         post_interval = float(out_cfg.get("post_interval", 0.25))
+        max_runtime = float(out_cfg.get("max_runtime", 60))
 
         while not self._stop_event.is_set():
             cmd = None
@@ -95,18 +140,28 @@ class TerminalMixin:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"$ {cmd}")
 
-            with self.busy(f"terminal: {cmd}"):
-                output = run_cmd(cmd)
-            lines = output.split("\n") if output else [""]
+            published = 0
+            last_publish = 0.0
 
-            if len(lines) > max_queue:
-                lines = lines[-max_queue:]
-
-            for line in lines:
+            def _on_line(line):
+                nonlocal published, last_publish
                 if self._stop_event.is_set():
-                    return
+                    return False
+                if published >= max_queue:
+                    return False
+                wait_left = post_interval - (time.monotonic() - last_publish)
+                if wait_left > 0:
+                    self._stop_event.wait(timeout=wait_left)
                 if self._terminal_output_enabled():
                     self.publish(self.terminal_output_topic, line)
-                self._stop_event.wait(timeout=post_interval)
+                last_publish = time.monotonic()
+                published += 1
+                return True
+
+            with self.busy(f"terminal: {cmd}"):
+                self._stream_cmd(cmd, _on_line, max_runtime)
+
+            if published == 0 and self._terminal_output_enabled():
+                self.publish(self.terminal_output_topic, "")
 
             self.publish(self.terminal_input_topic, "")
