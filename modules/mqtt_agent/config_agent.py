@@ -160,7 +160,7 @@ class ConfigAgentMixin:
                 "Terminal Output Post Interval",
                 term_out["post_interval"],
                 {"type": "dict", "keys": ["terminal", "terminal_output", "post_interval"]},
-                opts=_FLOAT_OPTS,
+                opts={"min": 0.1, "max": 3.0, "step": 0.1},
             )
 
         return result
