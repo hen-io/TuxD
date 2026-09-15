@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.63"
+VERSION = "1.0.64"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"

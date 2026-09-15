@@ -133,6 +133,10 @@ def merge_extra_config(main_config: dict, extra_config: dict) -> None:
 
         if key == "enabled" and isinstance(extra_val, bool) and isinstance(main_val, bool):
             main_config[key] = main_val or extra_val
+            continue
+
+        if isinstance(main_val, str) and main_val == "" and isinstance(extra_val, str) and extra_val != "":
+            main_config[key] = extra_val
 
 
 def _extract_header_comments(text: str) -> str:
