@@ -1,3 +1,4 @@
+import select
 import subprocess
 import threading
 import time
@@ -52,10 +53,14 @@ class TerminalMixin:
     def init_terminal(self):
         self.terminal_input_topic = f"{self.base_topic}/terminal_input"
         self.terminal_output_topic = f"{self.base_topic}/terminal_output"
+        self.terminal_stop_topic = f"{self.base_topic}/terminal_stop"
 
         if not hasattr(self, "_terminal_queue"):
             self._terminal_queue = deque()
             self._terminal_queue_lock = threading.Lock()
+
+        if not hasattr(self, "_terminal_cancel_event"):
+            self._terminal_cancel_event = threading.Event()
 
         if self._terminal_input_enabled():
             self._text_discovery(
@@ -65,8 +70,15 @@ class TerminalMixin:
                 icon="mdi:console-line"
             )
             self.publish(self.terminal_input_topic, "")
+            self._button_discovery(
+                "terminal_stop",
+                "Stop Terminal Command",
+                f"{self.terminal_stop_topic}/set",
+                icon="mdi:stop-circle-outline"
+            )
         else:
             self.publish(self._discovery_topic("text", "terminal_input"), "", retain=True)
+            self.publish(self._discovery_topic("button", "terminal_stop"), "", retain=True)
 
         if self._terminal_output_enabled():
             self._sensor_discovery(
@@ -108,6 +120,9 @@ class TerminalMixin:
 
         self.publish(self.terminal_input_topic, "")
 
+    def handle_terminal_stop_message(self):
+        self._terminal_cancel_event.set()
+
     def _stream_cmd(self, cmd, on_line, timeout):
         try:
             proc = subprocess.Popen(
@@ -123,15 +138,28 @@ class TerminalMixin:
             return
 
         start = time.monotonic()
-        timed_out = False
+        stop_reason = None
         try:
-            for line in proc.stdout:
+            while True:
                 if self._stop_event.is_set():
                     break
-                if not on_line(line.rstrip("\n")):
+                if self._terminal_cancel_event.is_set():
+                    stop_reason = "stopped by user"
                     break
                 if time.monotonic() - start > timeout:
-                    timed_out = True
+                    stop_reason = f"stopped after {int(timeout)}s"
+                    break
+
+                ready, _, _ = select.select([proc.stdout], [], [], 0.5)
+                if not ready:
+                    if proc.poll() is not None:
+                        break
+                    continue
+
+                line = proc.stdout.readline()
+                if line == "":
+                    break
+                if not on_line(line.rstrip("\n")):
                     break
         finally:
             if proc.poll() is None:
@@ -148,8 +176,8 @@ class TerminalMixin:
             except Exception:
                 pass
 
-        if timed_out:
-            on_line(f"[stopped after {int(timeout)}s]")
+        if stop_reason:
+            on_line(f"[{stop_reason}]")
 
     def terminal_loop(self):
         if not self._terminal_input_enabled():
@@ -169,6 +197,8 @@ class TerminalMixin:
             if cmd is None:
                 self._stop_event.wait(timeout=0.5)
                 continue
+
+            self._terminal_cancel_event.clear()
 
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"$ {cmd}")

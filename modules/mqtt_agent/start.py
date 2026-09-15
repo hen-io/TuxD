@@ -117,6 +117,11 @@ class HAMQTTAgent(
                 self.handle_terminal_message(payload)
             return
 
+        if topic == f"{self.base_topic}/terminal_stop/set":
+            if self._terminal_input_enabled():
+                self.handle_terminal_stop_message()
+            return
+
         if topic == f"{self.base_topic}/restart/set":
             self.handle_restart_message()
             return
@@ -176,6 +181,7 @@ class HAMQTTAgent(
 
         if self._terminal_input_enabled():
             self.client.subscribe(f"{self.base_topic}/terminal_input/set")
+            self.client.subscribe(f"{self.base_topic}/terminal_stop/set")
         self.client.subscribe(f"{self.base_topic}/restart/set")
         self.client.subscribe(f"{self.base_topic}/refresh/set")
         self.client.subscribe(f"{self.base_topic}/force_poll/set")

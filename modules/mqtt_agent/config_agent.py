@@ -164,7 +164,7 @@ class ConfigAgentMixin:
                 "Terminal Output Post Interval",
                 term_out["post_interval"],
                 {"type": "dict", "keys": ["terminal", "terminal_output", "post_interval"]},
-                opts={"min": 0.1, "max": 3.0, "step": 0.1},
+                opts={"min": 0.01, "max": 3.0, "step": 0.01},
             )
 
         return result
@@ -210,7 +210,7 @@ class ConfigAgentMixin:
             )
 
             val = entry["value"]
-            self.publish(state_topic, f"{val:.1f}" if entry["is_float"] else str(val), retain=True)
+            self.publish(state_topic, f"{val:.2f}" if entry["is_float"] else str(val), retain=True)
             self._config_num_cmd_topics[command_topic] = oid
 
     def handle_config_number(self, topic, payload):
@@ -243,7 +243,7 @@ class ConfigAgentMixin:
             return
 
         key = oid[len("cfgnum_"):]
-        val_str = f"{new_value:.1f}" if entry["is_float"] else str(new_value)
+        val_str = f"{new_value:.2f}" if entry["is_float"] else str(new_value)
         self.publish(f"{self.base_topic}/cfgnum/{key}", val_str, retain=True)
 
         self._cfgnum_schedule_restart()
