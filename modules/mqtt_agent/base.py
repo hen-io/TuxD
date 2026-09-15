@@ -34,7 +34,7 @@ class HAMQTTBase:
         self.version = version
         self.log_file = log_file
         self.client = mqtt.Client()
-        self.base_topic = f"TuxD{config['device']['name']}"
+        self.base_topic = f"tuxd/{config['device']['name']}"
         self.device_slug = slugify(config["device"]["name"])
 
         self.tty_output = config["device"].get("tty_output", False)
@@ -209,7 +209,7 @@ class HAMQTTBase:
             retain=True,
         )
 
-    def _update_discovery(self, object_id, name, state_topic, command_topic=None, device_class=None, icon=None, entity_category=None, ha_object_id=None, payload_install="INSTALL"):
+    def _update_discovery(self, object_id, name, state_topic, command_topic=None, device_class=None, icon=None, entity_category=None, ha_object_id=None, payload_install="INSTALL", attributes_topic=None):
         payload = {
             "name": name,
             "state_topic": state_topic,
@@ -227,6 +227,8 @@ class HAMQTTBase:
             payload["entity_category"] = entity_category
         if ha_object_id:
             payload["default_entity_id"] = f"update.{ha_object_id}"
+        if attributes_topic:
+            payload["json_attributes_topic"] = attributes_topic
 
         self.publish(
             self._discovery_topic("update", object_id),

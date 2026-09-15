@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.68"
+VERSION = "1.0.70"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -832,7 +832,7 @@ def _publish_emergency_error(cfg, reason):
             return
 
         port = int(mqtt_cfg.get("port", 1883))
-        base_topic = f"TuxD{device_name}"
+        base_topic = f"tuxd/{device_name}"
         device_info = {
             "identifiers": [device_name],
             "name": device_name,

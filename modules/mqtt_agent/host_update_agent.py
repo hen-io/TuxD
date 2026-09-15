@@ -34,6 +34,7 @@ class HostUpdateMixin:
             device_class=device_class,
             icon="mdi:server-security",
             entity_category="diagnostic",
+            attributes_topic=f"{base}/state_attributes",
         )
 
         self._sensor_discovery(
@@ -86,6 +87,17 @@ class HostUpdateMixin:
         counter = getattr(self, "docker_update_count", None)
         return counter() if callable(counter) else 0
 
+    def _kernel_version(self):
+        return run_cmd("uname -r").strip()
+
+    def _latest_kernel_from_pkgs(self, pkgs):
+        for p in pkgs:
+            head = p.split(">", 1)[0] if ">" in p else p
+            if "kernel" in head.lower() or "linux-image" in head.lower():
+                if ">" in p:
+                    return p.rsplit(">", 1)[-1].strip()
+        return ""
+
     def _publish_host_update_state(self):
         cfg = self.config.get("host_update", {}) or {}
         base = f"{self.base_topic}/host_update"
@@ -114,21 +126,19 @@ class HostUpdateMixin:
 
         pkgs = update_list(cfg.get("list_cmd") or None) if os_count > 0 else []
 
-        if count > 0:
-            parts = []
-            if os_count:
-                parts.append(f"{os_count} package(s)")
-            if docker_count:
-                parts.append(f"{docker_count} docker image(s)")
-            summary = " and ".join(parts) + " can be upgraded."
-            if pkgs:
-                summary += "\n" + "\n".join(f"- {p}" for p in pkgs)
-            state["release_summary"] = summary
+        if pkgs:
+            state["release_summary"] = "\n".join(f"- {p}" for p in pkgs)
 
         self._host_update_last_state = dict(state)
         self.publish(f"{base}/state", json.dumps(state), retain=True)
         self.publish(f"{base}/available", f"{count} updates available")
         self.publish(f"{base}/package_versions", self._packages_value(pkgs))
+
+        attrs = {"kernel_version": self._kernel_version()}
+        latest_kernel = self._latest_kernel_from_pkgs(pkgs)
+        if latest_kernel:
+            attrs["latest_kernel_version"] = latest_kernel
+        self.publish(f"{base}/state_attributes", json.dumps(attrs), retain=True)
         return True
 
     def _set_host_update_progress(self, in_progress):
