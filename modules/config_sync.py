@@ -207,14 +207,14 @@ def _apply_item_defaults(config: dict, item_defaults: dict) -> bool:
 def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str = None) -> bool:
     config_file = Path(config_path)
     conf_vars_file = Path(conf_vars_path)
-    if not conf_vars_file.exists() or not config_file.exists():
+    if not conf_vars_file.exists():
         return False
 
     conf_vars_text = conf_vars_file.read_text(encoding='utf-8')
     section_labels, section_samples = _parse_conf_vars(conf_vars_text)
     sample_markers = {key: sample.splitlines()[0] for key, sample in section_samples.items()}
 
-    original_text = config_file.read_text(encoding='utf-8')
+    original_text = config_file.read_text(encoding='utf-8') if config_file.exists() else ''
     try:
         config = yaml.safe_load(original_text) or {}
     except yaml.YAMLError:
