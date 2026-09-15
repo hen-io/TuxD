@@ -18,6 +18,10 @@ class ConfigAgentMixin:
     def _config_entity_id(self, domain, key):
         return f"{domain}.{self.device_slug}_config_{key}"
 
+    def _clear_stale_cfg_discovery(self, domain, prev_oids, current_oids):
+        for oid in (prev_oids - current_oids):
+            self.publish(self._discovery_topic(domain, oid), "", retain=True)
+
     def init_config_numbers(self):
         self._config_numbers = {}
         self._config_num_cmd_topics = {}
@@ -156,7 +160,7 @@ class ConfigAgentMixin:
         term_out = (cfg.get("terminal") or {}).get("terminal_output") or {}
         if isinstance(term_out, dict) and term_out.get("enabled", True) and "post_interval" in term_out:
             add(
-                "terminal_post_interval",
+                "terminal_output_post_interval",
                 "Terminal Output Post Interval",
                 term_out["post_interval"],
                 {"type": "dict", "keys": ["terminal", "terminal_output", "post_interval"]},
@@ -172,7 +176,9 @@ class ConfigAgentMixin:
         except Exception:
             fresh_cfg = self.config
 
-        self._config_numbers = self._collect_update_intervals(fresh_cfg)
+        new_numbers = self._collect_update_intervals(fresh_cfg)
+        self._clear_stale_cfg_discovery("number", set(self._config_numbers.keys()), set(new_numbers.keys()))
+        self._config_numbers = new_numbers
         self._config_num_cmd_topics = {}
 
         for oid, entry in self._config_numbers.items():
@@ -357,7 +363,9 @@ class ConfigAgentMixin:
         except Exception:
             fresh_cfg = self.config
 
-        self._config_texts = self._collect_config_texts(fresh_cfg)
+        new_texts = self._collect_config_texts(fresh_cfg)
+        self._clear_stale_cfg_discovery("text", set(self._config_texts.keys()), set(new_texts.keys()))
+        self._config_texts = new_texts
         self._config_txt_cmd_topics = {}
 
         for oid, entry in self._config_texts.items():
@@ -597,7 +605,9 @@ class ConfigAgentMixin:
         except Exception:
             fresh_cfg = self.config
 
-        self._config_switches = self._collect_enabled_flags(fresh_cfg)
+        new_switches = self._collect_enabled_flags(fresh_cfg)
+        self._clear_stale_cfg_discovery("switch", set(self._config_switches.keys()), set(new_switches.keys()))
+        self._config_switches = new_switches
         self._config_sw_cmd_topics = {}
 
         for oid, entry in self._config_switches.items():
