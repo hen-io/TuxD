@@ -1,8 +1,11 @@
+import getpass
 import select
 import subprocess
 import threading
 import time
 from collections import deque
+
+TERMINAL_STOP_SENTINEL = "__tuxd_stop__"
 
 
 class TerminalMixin:
@@ -62,6 +65,12 @@ class TerminalMixin:
         if not hasattr(self, "_terminal_cancel_event"):
             self._terminal_cancel_event = threading.Event()
 
+        if not hasattr(self, "_terminal_username"):
+            try:
+                self._terminal_username = getpass.getuser()
+            except Exception:
+                self._terminal_username = "user"
+
         if self._terminal_input_enabled():
             self._text_discovery(
                 object_id="terminal_input",
@@ -89,7 +98,15 @@ class TerminalMixin:
             )
             self.publish(self.terminal_output_topic, "")
 
+    def _terminal_prompt(self, cmd):
+        return f"{self._terminal_username}:~$ {cmd}"
+
     def handle_terminal_message(self, payload: str):
+        if payload == TERMINAL_STOP_SENTINEL:
+            self.handle_terminal_stop_message()
+            self.publish(self.terminal_input_topic, "")
+            return
+
         cmd = (payload or "").strip()
         if not cmd:
             return
@@ -97,7 +114,7 @@ class TerminalMixin:
         allowed, reason = self._cmd_allowed(cmd)
         if not allowed:
             if self._terminal_output_enabled():
-                self.publish(self.terminal_output_topic, f"$ {cmd}")
+                self.publish(self.terminal_output_topic, self._terminal_prompt(cmd))
                 self.publish(self.terminal_output_topic, f"[{reason}]")
             self.publish(self.terminal_input_topic, "")
             return
@@ -201,7 +218,7 @@ class TerminalMixin:
             self._terminal_cancel_event.clear()
 
             if self._terminal_output_enabled():
-                self.publish(self.terminal_output_topic, f"$ {cmd}")
+                self.publish(self.terminal_output_topic, self._terminal_prompt(cmd))
 
             published = 0
             last_publish = 0.0
