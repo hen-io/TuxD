@@ -270,6 +270,10 @@ class ConfigAgentMixin:
             self.set_error(True, "Configuration changed")
         except Exception:
             pass
+        try:
+            self.clear_discovery(timeout=5.0)
+        except Exception:
+            pass
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _cfgnum_schedule_restart(self):
