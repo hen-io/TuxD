@@ -11,13 +11,15 @@ class RestartMixin:
             "restart_agent",
             "Restart TuxD",
             f"{self.base_topic}/restart/set",
-            icon="mdi:restart"
+            icon="mdi:restart",
+            entity_category="diagnostic"
         )
         self._button_discovery(
             "refresh_agent",
             "Refresh TuxD Entities",
             f"{self.base_topic}/refresh/set",
-            icon="mdi:refresh"
+            icon="mdi:refresh",
+            entity_category="diagnostic"
         )
         self._button_discovery(
             "force_poll_agent",

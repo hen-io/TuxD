@@ -240,12 +240,7 @@ class ConfigAgentMixin:
         val_str = f"{new_value:.1f}" if entry["is_float"] else str(new_value)
         self.publish(f"{self.base_topic}/cfgnum/{key}", val_str, retain=True)
 
-        with self._cfgnum_restart_lock:
-            if self._cfgnum_restart_timer is not None:
-                self._cfgnum_restart_timer.cancel()
-            self._cfgnum_restart_timer = threading.Timer(10.0, self._cfgnum_restart)
-            self._cfgnum_restart_timer.daemon = True
-            self._cfgnum_restart_timer.start()
+        self._cfgnum_schedule_restart()
 
     def _cfgnum_apply(self, cfg, path_info, value):
         if path_info["type"] == "dict":
@@ -276,6 +271,28 @@ class ConfigAgentMixin:
         except Exception:
             pass
         os.execv(sys.executable, [sys.executable] + sys.argv)
+
+    def _cfgnum_schedule_restart(self):
+        with self._cfgnum_restart_lock:
+            if self._cfgnum_restart_timer is not None:
+                self._cfgnum_restart_timer.cancel()
+            self._cfgnum_restart_timer = threading.Timer(10.0, self._cfgnum_restart)
+            self._cfgnum_restart_timer.daemon = True
+            self._cfgnum_restart_timer.start()
+
+    def config_file_watch_loop(self):
+        try:
+            last_mtime = os.path.getmtime(_CONFIG_FILE)
+        except OSError:
+            last_mtime = None
+        while not self._stop_event.wait(timeout=5.0):
+            try:
+                mtime = os.path.getmtime(_CONFIG_FILE)
+            except OSError:
+                continue
+            if last_mtime is not None and mtime != last_mtime:
+                self._cfgnum_schedule_restart()
+            last_mtime = mtime
 
     def init_config_texts(self):
         self._config_texts = {}
@@ -372,12 +389,7 @@ class ConfigAgentMixin:
         key = oid[len("cfgtxt_"):]
         self.publish(f"{self.base_topic}/cfgtxt/{key}", new_value, retain=True)
 
-        with self._cfgnum_restart_lock:
-            if self._cfgnum_restart_timer is not None:
-                self._cfgnum_restart_timer.cancel()
-            self._cfgnum_restart_timer = threading.Timer(10.0, self._cfgnum_restart)
-            self._cfgnum_restart_timer.daemon = True
-            self._cfgnum_restart_timer.start()
+        self._cfgnum_schedule_restart()
 
     def init_config_switches(self):
         self._config_switches = {}
@@ -629,9 +641,4 @@ class ConfigAgentMixin:
         key = oid[len("cfgsw_"):]
         self.publish(f"{self.base_topic}/cfgsw/{key}", "ON" if new_value else "OFF", retain=True)
 
-        with self._cfgnum_restart_lock:
-            if self._cfgnum_restart_timer is not None:
-                self._cfgnum_restart_timer.cancel()
-            self._cfgnum_restart_timer = threading.Timer(10.0, self._cfgnum_restart)
-            self._cfgnum_restart_timer.daemon = True
-            self._cfgnum_restart_timer.start()
+        self._cfgnum_schedule_restart()

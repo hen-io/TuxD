@@ -239,6 +239,7 @@ class HAMQTTAgent(
             threading.Thread(target=self.host_update_loop, daemon=True).start()
 
         threading.Thread(target=self.self_update_loop, daemon=True).start()
+        threading.Thread(target=self.config_file_watch_loop, daemon=True).start()
 
         if self.config.get("tasks"):
             threading.Thread(target=self.tasks_loop, daemon=True).start()
