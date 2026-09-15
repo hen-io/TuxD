@@ -280,7 +280,7 @@ class ConfigAgentMixin:
         with self._cfgnum_restart_lock:
             if self._cfgnum_restart_timer is not None:
                 self._cfgnum_restart_timer.cancel()
-            self._cfgnum_restart_timer = threading.Timer(10.0, self._cfgnum_restart)
+            self._cfgnum_restart_timer = threading.Timer(5.0, self._cfgnum_restart)
             self._cfgnum_restart_timer.daemon = True
             self._cfgnum_restart_timer.start()
 

@@ -47,15 +47,15 @@ class SelfUpdateMixin:
 
     def _self_update_check(self):
         if not callable(self._update_checker):
-            return None, None, None
+            return None, None, None, None
         try:
             return self._update_checker()
         except Exception:
-            return None, None, None
+            return None, None, None, None
 
     def _publish_self_update_state(self):
         base = f"{self.base_topic}/self_update"
-        new_version, src_type, src_val = self._self_update_check()
+        new_version, src_type, src_val, release_notes = self._self_update_check()
 
         state = {
             "installed_version": self.version,
@@ -63,7 +63,13 @@ class SelfUpdateMixin:
             "title": "TuxD",
         }
         if new_version and src_type:
-            state["release_summary"] = f"{new_version} available via the {src_type} update source."
+            summary = (release_notes or {}).get("summary") or ""
+            if len(summary) > 500:
+                summary = summary[:500].rstrip() + "..."
+            state["release_summary"] = summary or f"{new_version} available via the {src_type} update source."
+            release_url = (release_notes or {}).get("url")
+            if release_url:
+                state["release_url"] = release_url
 
         self._self_update_last_state = dict(state)
         self.publish(f"{base}/state", json.dumps(state), retain=True)
@@ -97,7 +103,7 @@ class SelfUpdateMixin:
 
     def _run_self_update_install(self):
         try:
-            new_version, src_type, src_val = self._self_update_check()
+            new_version, src_type, src_val, _release_notes = self._self_update_check()
             if not new_version or not src_type or not src_val:
                 return
             self._set_self_update_progress(True)

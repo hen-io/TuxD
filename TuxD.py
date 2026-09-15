@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.55"
+VERSION = "1.0.56"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -334,17 +334,17 @@ def _fetch_json(url: str, timeout: int):
 
 def find_newer_release_github(prefer_latest=False):
     if not GITHUB_REPO:
-        return None, None
+        return None, None, None
 
     url = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
     try:
         releases = _fetch_json(url, timeout=GITHUB_TIMEOUT)
     except Exception as e:
         log_write(f"GitHub update check failed ({url}): {e}")
-        return None, None
+        return None, None, None
 
     if not isinstance(releases, list):
-        return None, None
+        return None, None, None
 
     by_version = {}
     for rel in releases:
@@ -364,13 +364,19 @@ def find_newer_release_github(prefer_latest=False):
             download_url = str(rel.get("tarball_url", "")).strip()
 
         if download_url:
-            by_version[v] = download_url
+            by_version[v] = (
+                download_url,
+                str(rel.get("body") or "").strip(),
+                str(rel.get("html_url") or "").strip(),
+            )
 
     target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed, prefer_latest=prefer_latest)
     if target and by_version.get(target):
-        return target, by_version[target]
+        download_url, notes, html_url = by_version[target]
+        release_notes = {"summary": notes, "url": html_url} if (notes or html_url) else None
+        return target, download_url, release_notes
 
-    return None, None
+    return None, None, None
 
 
 _DB_FILE = "database.json"
@@ -440,10 +446,10 @@ def clear_all_failed_markers():
 
 def choose_update():
     prefer_latest = _read_upgrade_info_flag("extra_deps")
-    v, url = find_newer_release_github(prefer_latest=prefer_latest)
+    v, url, release_notes = find_newer_release_github(prefer_latest=prefer_latest)
     if v and url and not is_version_recently_failed(v):
-        return v, "github", url
-    return None, None, None
+        return v, "github", url, release_notes
+    return None, None, None, None
 
 
 def _download_to_file(url: str, dest_path: Path, timeout: int):
@@ -1099,7 +1105,7 @@ def main():
             status.write(c("Checking for updates...", WHITE, BOLD))
             time.sleep(.5)
 
-        new_version, src_type, src_val = choose_update()
+        new_version, src_type, src_val, _release_notes = choose_update()
         if new_version and src_type and src_val:
             if enabled:
                 prompt_row = status.next_row() + 1
