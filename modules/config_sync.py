@@ -120,6 +120,21 @@ def _deep_merge_defaults(config: dict, defaults: dict) -> bool:
     return changed
 
 
+def merge_extra_config(main_config: dict, extra_config: dict) -> None:
+    for key, extra_val in extra_config.items():
+        if key not in main_config:
+            main_config[key] = extra_val
+            continue
+
+        main_val = main_config[key]
+        if isinstance(extra_val, dict) and isinstance(main_val, dict):
+            merge_extra_config(main_val, extra_val)
+            continue
+
+        if key == "enabled" and isinstance(extra_val, bool) and isinstance(main_val, bool):
+            main_config[key] = main_val or extra_val
+
+
 def _extract_header_comments(text: str) -> str:
     lines = text.splitlines(keepends=True)
     header = []

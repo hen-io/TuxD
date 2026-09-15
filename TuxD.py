@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.60"
+VERSION = "1.0.62"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -1071,8 +1071,8 @@ def main():
         try:
             extra_cfg = yaml.safe_load(Path(extra_config_path).read_text(encoding="utf-8")) or {}
             if isinstance(extra_cfg, dict):
-                from modules.config_sync import _deep_merge_defaults
-                _deep_merge_defaults(cfg, extra_cfg)
+                from modules.config_sync import merge_extra_config
+                merge_extra_config(cfg, extra_cfg)
         except Exception as e:
             log_write(f"Failed to load extra config ({extra_config_path}): {e}")
 
