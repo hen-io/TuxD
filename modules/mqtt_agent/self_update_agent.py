@@ -17,7 +17,7 @@ class SelfUpdateMixin:
 
         self._update_discovery(
             "self_update",
-            "TuxD",
+            "TuxD update",
             f"{base}/state",
             command_topic=command_topic,
             icon="mdi:linux",

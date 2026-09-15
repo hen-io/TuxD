@@ -64,6 +64,9 @@ components:
     enabled: false
     update_interval: 30
     accuracy_decimals: 2
+  system_load:
+    enabled: true
+    update_interval: 60
 
 #################################
 # Lag Monitor                   #

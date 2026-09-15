@@ -86,6 +86,29 @@ class ComponentSensorsMixin:
         )
         self.publish(f"{self.base_topic}/startup_time", self._startup_time, retain=True)
 
+        if cfg.get("system_load", {}).get("enabled", True):
+            self._sensor_discovery(
+                "load_avg_1m",
+                "Load average 1m",
+                f"{self.base_topic}/load_avg_1m",
+                icon="mdi:gauge",
+                state_class="measurement"
+            )
+            self._sensor_discovery(
+                "load_avg_5m",
+                "Load average 5m",
+                f"{self.base_topic}/load_avg_5m",
+                icon="mdi:gauge",
+                state_class="measurement"
+            )
+            self._sensor_discovery(
+                "load_avg_15m",
+                "Load average 15m",
+                f"{self.base_topic}/load_avg_15m",
+                icon="mdi:gauge",
+                state_class="measurement"
+            )
+
         web_cfg = cfg.get("web_check", {})
         if web_cfg.get("enabled", False):
             name = web_cfg.get("name") or "Internet"
@@ -290,6 +313,25 @@ class ComponentSensorsMixin:
                                     pass
 
                         self._cpu_baseline["iowait"] = cpu_snapshot
+
+            if cfg.get("system_load", {}).get("enabled", True):
+                load_cfg = cfg.get("system_load", {})
+                interval = load_cfg.get("update_interval", 60)
+                try:
+                    interval = float(interval)
+                except Exception:
+                    interval = 60.0
+
+                last = self._comp_last_run.get("system_load", 0.0)
+                if now - last >= interval:
+                    self._comp_last_run["system_load"] = now
+                    try:
+                        load1, load5, load15 = os.getloadavg()
+                        self.publish(f"{self.base_topic}/load_avg_1m", round(load1, 2))
+                        self.publish(f"{self.base_topic}/load_avg_5m", round(load5, 2))
+                        self.publish(f"{self.base_topic}/load_avg_15m", round(load15, 2))
+                    except Exception:
+                        pass
 
             if mem_enabled:
                 mem_cfg = cfg.get("memory_used", {})
