@@ -1,6 +1,6 @@
 import json
 import time
-from .base import run_cmd
+from .base import run_cmd, slugify as _slug
 
 _DEFAULT_SUFFIXES = {
     "updates_available": " new updates",
@@ -23,14 +23,16 @@ class StatusCommandsMixin:
             obj_id = f"status_{key}"
             topic = f"{self.base_topic}/{key}"
             attr_topic = f"{self.base_topic}/{key}_attributes"
+            custom_name = cfg.get("name")
 
             self._sensor_discovery(
                 object_id=obj_id,
-                name=cfg.get("name") or key.replace("_", " ").title(),
+                name=custom_name or key.replace("_", " ").title(),
                 state_topic=topic,
                 icon=cfg.get("icon") or "mdi:information-outline",
                 attributes_topic=attr_topic,
                 device_class=cfg.get("device_class"),
+                ha_object_id=f"{self.device_slug}_{_slug(custom_name)}" if custom_name else None,
             )
 
     def run_status_commands_loop(self):

@@ -546,14 +546,6 @@ class ConfigAgentMixin:
                     {"type": "dict", "keys": ["commands", "status", skey, "enabled"]},
                 )
 
-        t_in = (cfg.get("terminal") or {}).get("terminal_input")
-        if isinstance(t_in, dict) and "enabled" in t_in:
-            add(
-                "terminal_input",
-                "Terminal Input State",
-                t_in["enabled"],
-                {"type": "dict", "keys": ["terminal", "terminal_input", "enabled"]},
-            )
 
         t_out = (cfg.get("terminal") or {}).get("terminal_output")
         if isinstance(t_out, dict) and "enabled" in t_out:
