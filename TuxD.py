@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -444,6 +444,22 @@ def clear_all_failed_markers():
         _db_write(data)
 
 
+_AUTO_UPDATE_CHECK_MIN_INTERVAL = 300
+
+
+def _last_auto_update_check() -> float:
+    try:
+        return float(_db_read().get("last_auto_update_check", 0) or 0)
+    except Exception:
+        return 0.0
+
+
+def _mark_auto_update_checked():
+    data = _db_read()
+    data["last_auto_update_check"] = time.time()
+    _db_write(data)
+
+
 def choose_update(release_channel="stable"):
     prefer_latest = _read_upgrade_info_flag("extra_deps")
     v, url, release_notes = find_newer_release_github(prefer_latest=prefer_latest, release_channel=release_channel)
@@ -454,10 +470,6 @@ def choose_update(release_channel="stable"):
 
 def _download_to_file(url: str, dest_path: Path, timeout: int):
     headers = {"User-Agent": "TuxD-Updater"}
-    if _is_github_url(url):
-        token = _github_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as resp, open(dest_path, "wb") as f:
         shutil.copyfileobj(resp, f)
@@ -1216,9 +1228,17 @@ def main():
             status.write(c("Checking for updates...", WHITE, BOLD))
             time.sleep(.5)
 
-        new_version, src_type, src_val, _release_notes = choose_update(
-            release_channel=device_cfg.get("self_update_release_channel", "stable")
-        )
+        checked_now = time.time() - _last_auto_update_check() >= _AUTO_UPDATE_CHECK_MIN_INTERVAL
+        if checked_now:
+            _mark_auto_update_checked()
+            new_version, src_type, src_val, _release_notes = choose_update(
+                release_channel=device_cfg.get("self_update_release_channel", "stable")
+            )
+        else:
+            new_version, src_type, src_val, _release_notes = None, None, None, None
+            if enabled:
+                status.write(c("Update check skipped (checked recently).", WHITE, DIM))
+                time.sleep(.3)
         if new_version and src_type and src_val:
             if enabled:
                 prompt_row = status.next_row() + 1
@@ -1236,7 +1256,7 @@ def main():
             else:
                 _write_update_status("Update available")
                 log_write(f"Update {new_version} available but self_update_allow_install is false - not installing.")
-        else:
+        elif checked_now:
             _write_update_status("Up to date")
             if enabled:
                 status.write(c("No new update is available!", WHITE, BOLD))

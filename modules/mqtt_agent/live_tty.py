@@ -47,7 +47,7 @@ class LiveTtyMixin:
             try:
                 os.chdir(os.path.expanduser("~"))
                 env = dict(os.environ)
-                env["TERM"] = "xterm-256color"
+                env["TERM"] = self._tty_pick_term()
                 os.execvpe(shell, [shell], env)
             except Exception:
                 os._exit(1)
@@ -133,6 +133,14 @@ class LiveTtyMixin:
         if not info:
             return
         self._tty_set_size(info["master_fd"], cols, rows)
+
+    def _tty_pick_term(self):
+        try:
+            import curses
+            curses.setupterm("xterm-256color")
+            return "xterm-256color"
+        except Exception:
+            return "xterm"
 
     def _tty_set_size(self, master_fd, cols, rows):
         try:
