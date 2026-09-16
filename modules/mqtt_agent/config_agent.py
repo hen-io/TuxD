@@ -18,6 +18,26 @@ class ConfigAgentMixin:
     def _config_entity_id(self, domain, key):
         return f"{domain}.{self.device_slug}_config_{key}"
 
+    def _load_fresh_config(self):
+        try:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                fresh_cfg = yaml.safe_load(f) or {}
+        except Exception:
+            return self.config
+
+        extra_config_path = (fresh_cfg.get("device") or {}).get("extra_config_path", "")
+        if extra_config_path:
+            try:
+                with open(extra_config_path, "r", encoding="utf-8") as f:
+                    extra_cfg = yaml.safe_load(f) or {}
+                if isinstance(extra_cfg, dict):
+                    from ..config_sync import merge_extra_config
+                    merge_extra_config(fresh_cfg, extra_cfg)
+            except Exception:
+                pass
+
+        return fresh_cfg
+
     def _clear_stale_cfg_discovery(self, domain, prev_oids, current_oids):
         for oid in (prev_oids - current_oids):
             self.publish(self._discovery_topic(domain, oid), "", retain=True)
@@ -74,7 +94,7 @@ class ConfigAgentMixin:
             )
 
         dstats = dock.get("stats") or {}
-        if dstats.get("enabled", False) and "update_interval" in dstats:
+        if dock.get("enabled", False) and dstats.get("enabled", False) and "update_interval" in dstats:
             add(
                 "docker_stats",
                 "Docker Stats Update Interval",
@@ -181,12 +201,7 @@ class ConfigAgentMixin:
         return result
 
     def register_config_numbers(self):
-        try:
-            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-                fresh_cfg = yaml.safe_load(f) or {}
-        except Exception:
-            fresh_cfg = self.config
-
+        fresh_cfg = self._load_fresh_config()
         new_numbers = self._collect_update_intervals(fresh_cfg)
         self._clear_stale_cfg_discovery("number", set(self._config_numbers.keys()), set(new_numbers.keys()))
         self._config_numbers = new_numbers
@@ -340,7 +355,7 @@ class ConfigAgentMixin:
             )
 
         hup = cfg.get("host_update") or {}
-        if "install_button_name" in hup:
+        if "install_button_name" in hup and hup.get("enabled", False):
             add(
                 "host_update_install_button_name",
                 "Host Update Install Button Name",
@@ -352,12 +367,7 @@ class ConfigAgentMixin:
         return result
 
     def register_config_texts(self):
-        try:
-            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-                fresh_cfg = yaml.safe_load(f) or {}
-        except Exception:
-            fresh_cfg = self.config
-
+        fresh_cfg = self._load_fresh_config()
         new_texts = self._collect_config_texts(fresh_cfg)
         self._clear_stale_cfg_discovery("text", set(self._config_texts.keys()), set(new_texts.keys()))
         self._config_texts = new_texts
@@ -459,7 +469,7 @@ class ConfigAgentMixin:
             )
 
         dstats = dock.get("stats") or {}
-        if "enabled" in dstats:
+        if "enabled" in dstats and dock.get("enabled", False):
             add(
                 "docker_stats",
                 "Docker Stats State",
@@ -473,7 +483,7 @@ class ConfigAgentMixin:
             ("network", "Network"),
             ("disk", "Disk"),
         ):
-            if metric in dstats:
+            if metric in dstats and dock.get("enabled", False) and dstats.get("enabled", False):
                 add(
                     f"docker_stats_{metric}",
                     f"Docker Stats {label} State",
@@ -490,7 +500,7 @@ class ConfigAgentMixin:
                 {"type": "dict", "keys": ["host_update", "enabled"]},
             )
 
-        if "allow_install" in dock:
+        if "allow_install" in dock and dock.get("enabled", False):
             add(
                 "docker_allow_install",
                 "Docker Allow Install",
@@ -498,7 +508,7 @@ class ConfigAgentMixin:
                 {"type": "dict", "keys": ["docker", "allow_install"]},
             )
 
-        if "allow_install" in hup:
+        if "allow_install" in hup and hup.get("enabled", False):
             add(
                 "host_update_allow_install",
                 "Host Update Allow Install",
@@ -506,7 +516,7 @@ class ConfigAgentMixin:
                 {"type": "dict", "keys": ["host_update", "allow_install"]},
             )
 
-        if "use_custom_install_cmd" in hup:
+        if "use_custom_install_cmd" in hup and hup.get("enabled", False):
             add(
                 "host_update_use_custom_install_cmd",
                 "Host Update Use Custom Install Command",
@@ -586,12 +596,7 @@ class ConfigAgentMixin:
         return result
 
     def register_config_switches(self):
-        try:
-            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-                fresh_cfg = yaml.safe_load(f) or {}
-        except Exception:
-            fresh_cfg = self.config
-
+        fresh_cfg = self._load_fresh_config()
         new_switches = self._collect_enabled_flags(fresh_cfg)
         self._clear_stale_cfg_discovery("switch", set(self._config_switches.keys()), set(new_switches.keys()))
         self._config_switches = new_switches
