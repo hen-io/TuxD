@@ -37,6 +37,11 @@ class LiveTtyMixin:
 
         shell = (self._live_tty_cfg().get("shell") or "").strip() or os.environ.get("SHELL") or "/bin/bash"
 
+        home_dir = os.path.expanduser("~")
+        term_value = self._tty_pick_term()
+        child_env = dict(os.environ)
+        child_env["TERM"] = term_value
+
         try:
             pid, master_fd = pty.fork()
         except Exception:
@@ -45,10 +50,8 @@ class LiveTtyMixin:
 
         if pid == 0:
             try:
-                os.chdir(os.path.expanduser("~"))
-                env = dict(os.environ)
-                env["TERM"] = self._tty_pick_term()
-                os.execvpe(shell, [shell], env)
+                os.chdir(home_dir)
+                os.execvpe(shell, [shell], child_env)
             except Exception:
                 os._exit(1)
             return
