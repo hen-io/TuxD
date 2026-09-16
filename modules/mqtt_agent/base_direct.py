@@ -101,6 +101,8 @@ class HADirectBase:
 
         self._ha_url = url
         self._api_key = ha_cfg.get("api_key", "")
+        self._pairing_key = ha_cfg.get("pairing_key", "")
+        self._auth_key = self._api_key or self._pairing_key
         self._verify_ssl = bool(ha_cfg.get("verify_ssl", True))
         self._retry_delay = float(ha_cfg.get("retry_delay", 15))
 
@@ -136,7 +138,7 @@ class HADirectBase:
                     self._ws = ws
                     await ws.send(json.dumps({
                         "type": "hello",
-                        "auth": self._api_key,
+                        "auth": self._auth_key,
                         "device_id": self.config["device"]["name"],
                         "sw_version": self.version,
                         "model": f"TuxD Linux Agent Version {self.version}",

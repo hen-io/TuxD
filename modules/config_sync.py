@@ -108,6 +108,28 @@ def _migrate_interval_keys(config: dict) -> bool:
     return changed
 
 
+def _reorder_like_defaults(config, defaults):
+    if not isinstance(config, dict) or not isinstance(defaults, dict):
+        return config
+    reordered = {}
+    for key in defaults:
+        if key in config:
+            reordered[key] = _reorder_like_defaults(config[key], defaults[key])
+    for key in config:
+        if key not in reordered:
+            reordered[key] = config[key]
+    return reordered
+
+
+def _key_order_paths(d, prefix=()):
+    if not isinstance(d, dict):
+        return
+    for key, value in d.items():
+        path = prefix + (key,)
+        yield path
+        yield from _key_order_paths(value, path)
+
+
 def _deep_merge_defaults(config: dict, defaults: dict) -> bool:
     changed = False
     for key, default_val in defaults.items():
@@ -243,6 +265,10 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     yaml_changed = _deep_merge_defaults(config, defaults)
     item_defaults_changed = _apply_item_defaults(config, item_defaults)
 
+    reordered_config = _reorder_like_defaults(config, defaults)
+    order_changed = list(_key_order_paths(config)) != list(_key_order_paths(reordered_config))
+    config = reordered_config
+
     current_hash = _compute_samples_hash(section_samples)
     samples_changed = (_read_samples_hash(config_path) != current_hash)
 
@@ -252,7 +278,7 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     present_samples = _samples_present(original_text, sample_markers)
     needed_samples = {k for k in config if k in section_samples} - present_samples
 
-    if not migration_changed and not yaml_changed and not item_defaults_changed and not needed_seps and not needed_samples and not samples_changed:
+    if not migration_changed and not yaml_changed and not item_defaults_changed and not order_changed and not needed_seps and not needed_samples and not samples_changed:
         return False
 
     header = _extract_header_comments(original_text)

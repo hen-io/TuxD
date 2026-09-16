@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.1.0-BETA-2"
+VERSION = "1.1.0-BETA-3"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -884,6 +884,10 @@ def direct_ha_ok(cfg, timeout=5):
 
 def _publish_emergency_error(cfg, reason):
     try:
+        connection_mode = str((cfg or {}).get("tuxd", {}).get("connection_mode", "mqtt")).strip().lower()
+        if connection_mode != "mqtt":
+            return
+
         import paho.mqtt.client as mqtt
 
         mqtt_cfg = (cfg or {}).get("mqtt", {}) or {}
