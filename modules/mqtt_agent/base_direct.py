@@ -152,6 +152,8 @@ class HADirectBase:
                         return
                     self._auth_error = None
                     self._broker_lost = False
+
+                    self.refresh_discovery()
                     self._connected_event.set()
 
                     async for raw in ws:
@@ -187,6 +189,15 @@ class HADirectBase:
             return
         try:
             asyncio.run_coroutine_threadsafe(self._ws.send(json.dumps(obj)), self._loop)
+        except Exception:
+            pass
+
+    def _send_wait(self, obj, timeout):
+        if self._loop is None or self._ws is None:
+            return
+        try:
+            future = asyncio.run_coroutine_threadsafe(self._ws.send(json.dumps(obj)), self._loop)
+            future.result(timeout=timeout)
         except Exception:
             pass
 
@@ -243,8 +254,16 @@ class HADirectBase:
         return self.state_cache.get(topic, "")
 
     def clear_discovery(self, timeout=2.0):
+        per_message_timeout = min(float(timeout), 1.0)
         for topic in list(self._known_discovery_topics):
-            self.publish(topic, "", retain=True)
+            domain, object_id = _parse_discovery_topic(topic)
+            if domain is None:
+                continue
+            self.state_cache[topic] = ""
+            self._send_wait(
+                {"type": "discovery_clear", "domain": domain, "object_id": object_id},
+                per_message_timeout,
+            )
 
 
     def _discovery_topic(self, domain, object_id):

@@ -301,7 +301,8 @@ class TuxDAgentMixin(
     def start(self, on_ready=None):
         self.connect()
 
-        self.refresh_discovery()
+        if not isinstance(self, HADirectBase):
+            self.refresh_discovery()
 
         settle = float((self.config.get("device") or {}).get("discovery_settle_delay", 2.0))
         if settle > 0:
@@ -336,7 +337,8 @@ class TuxDAgentMixin(
         except Exception:
             pass
 
-        threading.Thread(target=self.discovery_refresh_loop, daemon=True).start()
+        if not isinstance(self, HADirectBase):
+            threading.Thread(target=self.discovery_refresh_loop, daemon=True).start()
         threading.Thread(target=self.run_status_commands_loop, daemon=True).start()
         threading.Thread(target=self.run_default_entities_loop, daemon=True).start()
         threading.Thread(target=self.component_sensors_loop, daemon=True).start()
