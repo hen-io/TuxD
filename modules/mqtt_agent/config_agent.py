@@ -27,6 +27,8 @@ class ConfigAgentMixin:
         self._config_num_cmd_topics = {}
         self._cfgnum_restart_timer = None
         self._cfgnum_restart_lock = threading.Lock()
+        device_cfg = self.config.get("device", {}) or {}
+        self._cfgnum_restart_delay = float(device_cfg.get("config_restart_delay", 30))
 
     def _collect_update_intervals(self, cfg):
         result = {}
@@ -167,6 +169,15 @@ class ConfigAgentMixin:
                 opts={"min": 0.01, "max": 3.0, "step": 0.01},
             )
 
+        device_cfg = cfg.get("device") or {}
+        add(
+            "config_restart_delay",
+            "Config Restart Delay",
+            device_cfg.get("config_restart_delay", 30),
+            {"type": "dict", "keys": ["device", "config_restart_delay"]},
+            opts={"min": 1, "max": 300, "step": 1},
+        )
+
         return result
 
     def register_config_numbers(self):
@@ -286,7 +297,7 @@ class ConfigAgentMixin:
         with self._cfgnum_restart_lock:
             if self._cfgnum_restart_timer is not None:
                 self._cfgnum_restart_timer.cancel()
-            self._cfgnum_restart_timer = threading.Timer(5.0, self._cfgnum_restart)
+            self._cfgnum_restart_timer = threading.Timer(self._cfgnum_restart_delay, self._cfgnum_restart)
             self._cfgnum_restart_timer.daemon = True
             self._cfgnum_restart_timer.start()
 
