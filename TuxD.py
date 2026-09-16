@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -958,6 +958,75 @@ def _publish_emergency_error(cfg, reason):
         pass
 
 
+def _cleanup_stale_mqtt_discovery(cfg, timeout=5):
+    from modules.mqtt_agent.base import HAMQTTBase
+
+    mqtt_cfg = (cfg or {}).get("mqtt") or {}
+    broker = (mqtt_cfg.get("broker") or "").strip()
+    device_name = (cfg.get("device") or {}).get("name")
+    if not broker or not device_name:
+        return
+
+    try:
+        cleaner = HAMQTTBase(cfg, VERSION)
+    except Exception as e:
+        log_write(f"Could not prepare MQTT discovery cleanup after switching to direct mode: {e!r}")
+        return
+
+    state = {"connected": False}
+
+    def _on_connect(client, userdata, flags, *args, **kwargs):
+        rc = args[0] if args else 1
+        try:
+            state["connected"] = int(rc) == 0
+        except Exception:
+            state["connected"] = False
+
+    cleaner.client.on_connect = _on_connect
+    cleaner.client.username_pw_set(mqtt_cfg.get("username"), mqtt_cfg.get("password"))
+
+    try:
+        cleaner.client.connect(broker, int(mqtt_cfg.get("port", 1883)), 60)
+    except Exception as e:
+        log_write(f"Could not reach old MQTT broker to clear stale discovery entries: {e!r}")
+        return
+
+    start = time.time()
+    while time.time() - start < timeout and not state["connected"]:
+        cleaner.client.loop(timeout=0.2)
+
+    if not state["connected"]:
+        log_write("Old MQTT broker did not accept the connection - stale discovery entries for this device were left in place.")
+        try:
+            cleaner.client.disconnect()
+        except Exception:
+            pass
+        return
+
+    cleaner.client.loop_start()
+    try:
+        cleaner.clear_discovery(timeout=3.0)
+        log_write(f"Cleared stale MQTT discovery entries for {device_name} after switching to connection_mode: direct.")
+    except Exception as e:
+        log_write(f"Failed clearing stale MQTT discovery entries: {e!r}")
+    finally:
+        try:
+            cleaner.client.loop_stop()
+            cleaner.client.disconnect()
+        except Exception:
+            pass
+
+
+def _sync_connection_mode_state(cfg, connection_mode):
+    db = _db_read()
+    last_mode = db.get("last_connection_mode")
+    if last_mode == "mqtt" and connection_mode == "direct":
+        _cleanup_stale_mqtt_discovery(cfg)
+    if last_mode != connection_mode:
+        db["last_connection_mode"] = connection_mode
+        _db_write(db)
+
+
 def restart_in(seconds=10):
     time.sleep(seconds)
     os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -1247,6 +1316,8 @@ def main():
             label = "Home Assistant" if is_direct else "MQTT broker"
             status.write(c(f"Successfully tested connection to {label}!", GREEN, BOLD))
             time.sleep(.5)
+
+        _sync_connection_mode_state(cfg, connection_mode)
 
         try:
             from modules.mqtt_agent import build_agent
