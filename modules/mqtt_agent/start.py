@@ -210,6 +210,7 @@ class TuxDAgentMixin(
             self.register_docker,
             self.register_host_update,
             self.register_self_update,
+            self.register_release_channel_select,
             self.register_lag_monitor,
             self.register_lm_sensors,
             self.register_selects,
@@ -293,6 +294,10 @@ class TuxDAgentMixin(
             self.handle_self_update_check()
             return
 
+        if topic == f"{self.base_topic}/cfgselect_self_update_release_channel/set":
+            self.handle_release_channel_select(topic, payload)
+            return
+
     def start(self, on_ready=None):
         self.connect()
 
@@ -316,6 +321,7 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/host_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/check/set")
+        self.client.subscribe(f"{self.base_topic}/cfgselect_self_update_release_channel/set")
 
         if on_ready is not None:
             try:

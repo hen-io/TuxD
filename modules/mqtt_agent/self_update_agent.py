@@ -1,6 +1,14 @@
 import json
 import threading
 
+import yaml
+
+from .config_agent import _CONFIG_FILE
+
+_RELEASE_CHANNELS = ("stable", "rc", "beta")
+_RELEASE_CHANNEL_LABELS = {"stable": "Stable", "rc": "RC", "beta": "Beta"}
+_RELEASE_CHANNEL_BY_LABEL = {v: k for k, v in _RELEASE_CHANNEL_LABELS.items()}
+
 
 class SelfUpdateMixin:
     def init_self_update(self):
@@ -9,6 +17,7 @@ class SelfUpdateMixin:
         self._self_update_allow_install = bool(device_cfg.get("self_update_allow_install", True))
         self._self_update_installing = False
         self._self_update_last_state = None
+        self._release_channel_cmd_topic = None
 
     def register_self_update(self):
         base = f"{self.base_topic}/self_update"
@@ -44,6 +53,55 @@ class SelfUpdateMixin:
                 }),
                 retain=True,
             )
+
+    def register_release_channel_select(self):
+        try:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                fresh_cfg = yaml.safe_load(f) or {}
+        except Exception:
+            fresh_cfg = self.config
+
+        current = str((fresh_cfg.get("device") or {}).get("self_update_release_channel", "stable")).strip().lower()
+        if current not in _RELEASE_CHANNELS:
+            current = "stable"
+
+        oid = "cfgselect_self_update_release_channel"
+        state_topic = f"{self.base_topic}/{oid}"
+        command_topic = f"{state_topic}/set"
+        self._release_channel_cmd_topic = command_topic
+
+        payload = {
+            "name": "TuxD Release Channel",
+            "state_topic": state_topic,
+            "command_topic": command_topic,
+            "options": [_RELEASE_CHANNEL_LABELS[c] for c in _RELEASE_CHANNELS],
+            "unique_id": f"{self.config['device']['name']}_{oid}",
+            "device": self.device_info,
+            "icon": "mdi:source-branch",
+            "entity_category": "config",
+        }
+        self.publish(self._discovery_topic("select", oid), json.dumps(payload), retain=True)
+        self.publish(state_topic, _RELEASE_CHANNEL_LABELS[current], retain=True)
+
+    def handle_release_channel_select(self, topic, payload):
+        if topic != self._release_channel_cmd_topic:
+            return
+        channel = _RELEASE_CHANNEL_BY_LABEL.get(payload.strip())
+        if channel is None:
+            return
+
+        try:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+            cfg.setdefault("device", {})["self_update_release_channel"] = channel
+            with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
+                yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        except Exception:
+            return
+
+        oid = "cfgselect_self_update_release_channel"
+        self.publish(f"{self.base_topic}/{oid}", _RELEASE_CHANNEL_LABELS[channel], retain=True)
+        self._cfgnum_schedule_restart()
 
     def _self_update_check(self):
         if not callable(self._update_checker):

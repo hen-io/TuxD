@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.1.0-RC-1"
+VERSION = "1.0.76"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -260,6 +260,41 @@ def version_tuple(v: str):
     return tuple(int(p) for p in parts) if parts else (0,)
 
 
+_CHANNEL_RANK = {"beta": 0, "rc": 1, "stable": 2}
+_CHANNEL_VISIBILITY = {
+    "stable": {"stable"},
+    "rc": {"stable", "rc"},
+    "beta": {"stable", "rc", "beta"},
+}
+_RELEASE_TAG_RE = re.compile(r'^(\d+(?:\.\d+)*)(?:-(RC|BETA)-(\d+))?$', re.IGNORECASE)
+
+
+def parse_release_channel(v: str):
+    m = _RELEASE_TAG_RE.match(str(v).strip())
+    if not m:
+        return None
+    base = tuple(int(p) for p in m.group(1).split('.'))
+    if m.group(2) is None:
+        return base, "stable", 0
+    return base, m.group(2).lower(), int(m.group(3))
+
+
+def channel_sort_key(v: str):
+    parsed = parse_release_channel(v)
+    if parsed is None:
+        return version_tuple(v), _CHANNEL_RANK["stable"], 0
+    base, channel, num = parsed
+    return base, _CHANNEL_RANK[channel], num
+
+
+def is_visible_on_channel(v: str, selected_channel: str) -> bool:
+    parsed = parse_release_channel(v)
+    if parsed is None:
+        return True
+    _, channel, _ = parsed
+    return channel in _CHANNEL_VISIBILITY.get(selected_channel, _CHANNEL_VISIBILITY["stable"])
+
+
 def _read_upgrade_info_flag(name: str) -> bool:
     try:
         path = Path(__file__).resolve().parent / "bin" / "upgrade" / "upgrade.info"
@@ -282,19 +317,19 @@ def _select_update_target(current_version, available_versions, exclude=None, pre
     if not pool:
         return None
 
-    cur = version_tuple(current_version)
+    cur = channel_sort_key(current_version)
 
     if prefer_latest:
-        latest = max(pool, key=version_tuple)
-        return latest if version_tuple(latest) != cur else None
+        latest = max(pool, key=channel_sort_key)
+        return latest if channel_sort_key(latest) != cur else None
 
-    newer = sorted((v for v in pool if version_tuple(v) > cur), key=version_tuple)
+    newer = sorted((v for v in pool if channel_sort_key(v) > cur), key=channel_sort_key)
     if newer:
         return newer[0]
 
-    by_version = sorted(pool, key=version_tuple)
+    by_version = sorted(pool, key=channel_sort_key)
     latest = by_version[-1]
-    if version_tuple(latest) != cur:
+    if channel_sort_key(latest) != cur:
         return latest
     return None
 
@@ -332,7 +367,7 @@ def _fetch_json(url: str, timeout: int):
     return json.loads(data.decode("utf-8-sig", errors="replace"))
 
 
-def find_newer_release_github(prefer_latest=False):
+def find_newer_release_github(prefer_latest=False, release_channel="stable"):
     if not GITHUB_REPO:
         return None, None, None
 
@@ -350,7 +385,9 @@ def find_newer_release_github(prefer_latest=False):
     for rel in releases:
         tag = str(rel.get("tag_name", "")).strip()
         v = tag[1:] if tag[:1] in ("v", "V") else tag
-        if not v or not v.replace(".", "").isdigit():
+        if not v or parse_release_channel(v) is None:
+            continue
+        if not is_visible_on_channel(v, release_channel):
             continue
 
         download_url = ""
@@ -374,9 +411,9 @@ def find_newer_release_github(prefer_latest=False):
     if target and by_version.get(target):
         download_url, _, target_html_url = by_version[target]
 
-        cur_v = version_tuple(VERSION)
-        newer = [v for v in by_version if version_tuple(v) > cur_v]
-        newer.sort(key=version_tuple, reverse=True)
+        cur_v = channel_sort_key(VERSION)
+        newer = [v for v in by_version if channel_sort_key(v) > cur_v]
+        newer.sort(key=channel_sort_key, reverse=True)
 
         chunks = [f"{v}\n{by_version[v][1]}" for v in newer if by_version[v][1]]
         summary = "\n\n".join(chunks)
@@ -453,9 +490,9 @@ def clear_all_failed_markers():
         _db_write(data)
 
 
-def choose_update():
+def choose_update(release_channel="stable"):
     prefer_latest = _read_upgrade_info_flag("extra_deps")
-    v, url, release_notes = find_newer_release_github(prefer_latest=prefer_latest)
+    v, url, release_notes = find_newer_release_github(prefer_latest=prefer_latest, release_channel=release_channel)
     if v and url and not is_version_recently_failed(v):
         return v, "github", url, release_notes
     return None, None, None, None
@@ -739,7 +776,7 @@ def ask_install_update(new_version: str, timeout: int = 10, enabled=True) -> boo
     if not enabled:
         return False
 
-    is_upgrade = version_tuple(new_version) > version_tuple(VERSION)
+    is_upgrade = channel_sort_key(new_version) > channel_sort_key(VERSION)
     label = "Found new update:" if is_upgrade else "Found rollback target:"
     verb = "update" if is_upgrade else "rollback"
 
@@ -1152,7 +1189,9 @@ def main():
             status.write(c("Checking for updates...", WHITE, BOLD))
             time.sleep(.5)
 
-        new_version, src_type, src_val, _release_notes = choose_update()
+        new_version, src_type, src_val, _release_notes = choose_update(
+            release_channel=device_cfg.get("self_update_release_channel", "stable")
+        )
         if new_version and src_type and src_val:
             if enabled:
                 prompt_row = status.next_row() + 1
@@ -1239,7 +1278,9 @@ def main():
                 agent = build_agent(
                     cfg, VERSION, log_file=_LOG_FILE, log_level=log_level,
                     update_status=_read_update_status(),
-                    update_checker=choose_update,
+                    update_checker=lambda: choose_update(
+                        release_channel=(cfg.get("device") or {}).get("self_update_release_channel", "stable")
+                    ),
                     update_applier=lambda nv, st, sv: safe_apply_update_any(nv, st, sv, enabled=False),
                 )
             except Exception as e:
