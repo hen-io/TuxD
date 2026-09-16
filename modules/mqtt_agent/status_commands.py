@@ -9,7 +9,7 @@ _DEFAULT_SUFFIXES = {
 
 class StatusCommandsMixin:
     def init_status(self):
-        self.commands_status = self.config.get("commands", {}).get("status", {})
+        self.commands_status = (self.config.get("commands") or {}).get("status") or {}
         self._status_last_run = {}
         self._status_env = {}
 

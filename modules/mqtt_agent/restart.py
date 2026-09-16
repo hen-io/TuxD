@@ -33,8 +33,7 @@ class RestartMixin:
         def _restart():
             ts = datetime.datetime.now().strftime("%H:%M:%S")
             msg = f'{ts}: Button "Restart TuxD" pressed!'
-            self.state_cache[self.terminal_output_topic] = msg
-            self.client.publish(self.terminal_output_topic, msg)
+            self.publish(self.terminal_output_topic, msg)
             if self.tty_output:
                 print(self._gray(msg))
             if self.log_file is not None:
@@ -57,8 +56,7 @@ class RestartMixin:
         def _refresh():
             ts = datetime.datetime.now().strftime("%H:%M:%S")
             msg = f'{ts}: Button "Refresh TuxD Entities" pressed - clearing discovery...'
-            self.state_cache[self.terminal_output_topic] = msg
-            self.client.publish(self.terminal_output_topic, msg)
+            self.publish(self.terminal_output_topic, msg)
             if self.tty_output:
                 print(self._gray(msg))
             if self.log_file is not None:
@@ -78,8 +76,7 @@ class RestartMixin:
         def _force_poll():
             ts = datetime.datetime.now().strftime("%H:%M:%S")
             msg = f'{ts}: Button "Force Refresh All Sensors" pressed - restarting to poll everything now...'
-            self.state_cache[self.terminal_output_topic] = msg
-            self.client.publish(self.terminal_output_topic, msg)
+            self.publish(self.terminal_output_topic, msg)
             if self.tty_output:
                 print(self._gray(msg))
             if self.log_file is not None:

@@ -337,22 +337,6 @@ class ConfigAgentMixin:
                 {"type": "dict", "keys": ["host_update", "install_button_name"]},
             )
 
-        if "install_cmd" in hup:
-            add(
-                "host_update_install_cmd",
-                "Host Update Install Command",
-                hup["install_cmd"],
-                {"type": "dict", "keys": ["host_update", "install_cmd"]},
-            )
-
-        for skey, sval in ((cfg.get("commands") or {}).get("status") or {}).items():
-            if isinstance(sval, dict) and "cmd" in sval:
-                add(
-                    f"status_{_slug(skey)}_cmd",
-                    f"{skey.replace('_', ' ').title()} Command",
-                    sval["cmd"],
-                    {"type": "dict", "keys": ["commands", "status", skey, "cmd"]},
-                )
 
         return result
 

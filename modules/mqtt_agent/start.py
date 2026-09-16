@@ -1,8 +1,10 @@
+import json
 import time
 import threading
 import datetime
 
 from .base import HAMQTTBase
+from .base_direct import HADirectBase
 from .terminal import TerminalMixin
 from .restart import RestartMixin
 from .status_commands import StatusCommandsMixin
@@ -23,7 +25,7 @@ from .default_entities_agent import DefaultEntitiesMixin
 from .system_status_agent import SystemStatusMixin
 
 
-class HAMQTTAgent(
+class TuxDAgentMixin(
     TerminalMixin,
     RestartMixin,
     StatusCommandsMixin,
@@ -42,11 +44,10 @@ class HAMQTTAgent(
     SelectMixin,
     ConfigAgentMixin,
     SystemStatusMixin,
-    HAMQTTBase,
 ):
     def __init__(self, config, version, log_file=None, log_level="all", update_status="Up to date",
                  update_checker=None, update_applier=None):
-        HAMQTTBase.__init__(self, config, version, log_file=log_file, log_level=log_level)
+        super().__init__(config, version, log_file=log_file, log_level=log_level)
 
         self._update_status = update_status
         self._update_checker = update_checker
@@ -71,6 +72,128 @@ class HAMQTTAgent(
         self.init_config_switches()
         self.init_config_texts()
         self.init_system_status()
+
+    def _sensor_discovery(self, object_id, name, state_topic, unit=None, icon=None, attributes_topic=None, ha_object_id=None, state_class=None, entity_category=None, device_class=None):
+        payload = {
+            "name": name,
+            "state_topic": state_topic,
+            "unique_id": f"{self.config['device']['name']}_{object_id}",
+            "device": self.device_info,
+        }
+        if ha_object_id:
+            payload["default_entity_id"] = f"sensor.{ha_object_id}"
+        if state_class:
+            payload["state_class"] = state_class
+        if unit:
+            payload["unit_of_measurement"] = unit
+        if icon:
+            payload["icon"] = icon
+        if attributes_topic:
+            payload["json_attributes_topic"] = attributes_topic
+        if entity_category:
+            payload["entity_category"] = entity_category
+        if device_class:
+            payload["device_class"] = device_class
+
+        self.publish(
+            self._discovery_topic("sensor", object_id),
+            json.dumps(payload),
+            retain=True
+        )
+
+    def _binary_sensor_discovery(self, object_id, name, state_topic, device_class=None, icon=None, attributes_topic=None, entity_category=None):
+        payload = {
+            "name": name,
+            "state_topic": state_topic,
+            "unique_id": f"{self.config['device']['name']}_{object_id}",
+            "device": self.device_info,
+            "payload_on": "ON",
+            "payload_off": "OFF",
+        }
+        if device_class:
+            payload["device_class"] = device_class
+        if icon:
+            payload["icon"] = icon
+        if attributes_topic:
+            payload["json_attributes_topic"] = attributes_topic
+        if entity_category:
+            payload["entity_category"] = entity_category
+
+        self.publish(
+            self._discovery_topic("binary_sensor", object_id),
+            json.dumps(payload),
+            retain=True,
+        )
+
+    def _update_discovery(self, object_id, name, state_topic, command_topic=None, device_class=None, icon=None, entity_category=None, ha_object_id=None, payload_install="INSTALL", attributes_topic=None):
+        payload = {
+            "name": name,
+            "state_topic": state_topic,
+            "unique_id": f"{self.config['device']['name']}_{object_id}",
+            "device": self.device_info,
+        }
+        if command_topic:
+            payload["command_topic"] = command_topic
+            payload["payload_install"] = payload_install
+        if device_class:
+            payload["device_class"] = device_class
+        if icon:
+            payload["icon"] = icon
+        if entity_category:
+            payload["entity_category"] = entity_category
+        if ha_object_id:
+            payload["default_entity_id"] = f"update.{ha_object_id}"
+        if attributes_topic:
+            payload["json_attributes_topic"] = attributes_topic
+
+        self.publish(
+            self._discovery_topic("update", object_id),
+            json.dumps(payload),
+            retain=True,
+        )
+
+    def _text_discovery(self, object_id, name, command_topic, icon=None, state_topic=None, entity_category=None, ha_object_id=None):
+        state_topic = state_topic or f"{self.base_topic}/{object_id}"
+
+        payload = {
+            "name": name,
+            "command_topic": command_topic,
+            "state_topic": state_topic,
+            "cmd_t": command_topic,
+            "stat_t": state_topic,
+            "unique_id": f"{self.config['device']['name']}_{object_id}",
+            "device": self.device_info,
+        }
+        if icon:
+            payload["icon"] = icon
+        if entity_category:
+            payload["entity_category"] = entity_category
+        if ha_object_id:
+            payload["default_entity_id"] = f"text.{ha_object_id}"
+
+        self.publish(
+            self._discovery_topic("text", object_id),
+            json.dumps(payload),
+            retain=True
+        )
+
+    def _button_discovery(self, object_id, name, command_topic, icon=None, entity_category=None):
+        payload = {
+            "name": name,
+            "command_topic": command_topic,
+            "unique_id": f"{self.config['device']['name']}_{object_id}",
+            "device": self.device_info,
+        }
+        if icon:
+            payload["icon"] = icon
+        if entity_category:
+            payload["entity_category"] = entity_category
+
+        self.publish(
+            self._discovery_topic("button", object_id),
+            json.dumps(payload),
+            retain=True
+        )
 
     def refresh_discovery(self):
         registrars = (
@@ -269,3 +392,18 @@ class HAMQTTAgent(
             self.client.disconnect()
         except Exception:
             pass
+
+
+class HAMQTTAgent(TuxDAgentMixin, HAMQTTBase):
+    pass
+
+
+class HADirectAgent(TuxDAgentMixin, HADirectBase):
+    pass
+
+
+def build_agent(config, version, **kwargs):
+    mode = str((config.get("tuxd") or {}).get("connection_mode", "mqtt")).strip().lower()
+    if mode == "direct":
+        return HADirectAgent(config, version, **kwargs)
+    return HAMQTTAgent(config, version, **kwargs)

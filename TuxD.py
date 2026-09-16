@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.0.75"
+VERSION = "1.1.0-RC-1"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -820,6 +820,31 @@ def mqtt_broker_ok(cfg, timeout=5):
     return bool(state["ok"])
 
 
+def direct_ha_ok(cfg, timeout=5):
+    import urllib.request
+    import urllib.error
+    import ssl as _ssl
+
+    ha_cfg = (cfg or {}).get("home-assistant", {}) or {}
+    url = (ha_cfg.get("url") or "").strip()
+    if not url:
+        return False
+
+    ctx = None
+    if url.startswith("https://") and not bool(ha_cfg.get("verify_ssl", True)):
+        ctx = _ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = _ssl.CERT_NONE
+
+    try:
+        urllib.request.urlopen(url, timeout=timeout, context=ctx)
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except Exception:
+        return False
+
+
 def _publish_emergency_error(cfg, reason):
     try:
         import paho.mqtt.client as mqtt
@@ -1081,7 +1106,10 @@ def main():
     log_level = str(device_cfg.get("log_level", "all")).lower().strip()
     if log_level not in ("all", "error"):
         log_level = "all"
-    retry_delay = int(((cfg or {}).get("mqtt") or {}).get("retry_delay", 30))
+    if str((cfg.get("tuxd") or {}).get("connection_mode", "mqtt")).strip().lower() == "direct":
+        retry_delay = int((cfg.get("home-assistant") or {}).get("retry_delay", 15))
+    else:
+        retry_delay = int(((cfg or {}).get("mqtt") or {}).get("retry_delay", 30))
     enabled = _isatty()
     _TTY_ENABLED = enabled
 
@@ -1148,27 +1176,37 @@ def main():
                 status.write(c("No new update is available!", WHITE, BOLD))
                 time.sleep(1)
 
+        connection_mode = str((cfg.get("tuxd") or {}).get("connection_mode", "mqtt")).strip().lower()
+        is_direct = connection_mode == "direct"
+
         if enabled:
-            status.write(c("Testing connecting to MQTT broker...", WHITE))
+            label = "Home Assistant" if is_direct else "MQTT broker"
+            status.write(c(f"Testing connecting to {label}...", WHITE))
             time.sleep(1)
 
-        if not mqtt_broker_ok(cfg, timeout=5):
+        preflight_ok = direct_ha_ok(cfg, timeout=5) if is_direct else mqtt_broker_ok(cfg, timeout=5)
+        if not preflight_ok:
             if enabled:
-                mqtt_cfg = (cfg or {}).get("mqtt", {}) or {}
-                host = mqtt_cfg.get("broker", "<missing>")
-                port = mqtt_cfg.get("port", 1883)
-                status.write(c(f"MQTT broker not ready: {host}:{port}", RED, BOLD))
+                if is_direct:
+                    target = (cfg.get("home-assistant") or {}).get("url", "<missing>")
+                    status.write(c(f"Home Assistant not ready: {target}", RED, BOLD))
+                else:
+                    mqtt_cfg = (cfg or {}).get("mqtt", {}) or {}
+                    host = mqtt_cfg.get("broker", "<missing>")
+                    port = mqtt_cfg.get("port", 1883)
+                    status.write(c(f"MQTT broker not ready: {host}:{port}", RED, BOLD))
                 status.write(c(f"Retrying in {retry_delay}s...", YELLOW, BOLD))
                 time.sleep(0.5)
             restart_in(retry_delay)
             return
 
         if enabled:
-            status.write(c("Successfully tested connection to MQTT broker!", GREEN, BOLD))
+            label = "Home Assistant" if is_direct else "MQTT broker"
+            status.write(c(f"Successfully tested connection to {label}!", GREEN, BOLD))
             time.sleep(.5)
 
         try:
-            from modules.mqtt_agent import HAMQTTAgent
+            from modules.mqtt_agent import build_agent
         except Exception as e:
             if enabled:
                 status.write(c(f"Import error: {e}", RED, BOLD))
@@ -1198,7 +1236,7 @@ def main():
 
         while True:
             try:
-                agent = HAMQTTAgent(
+                agent = build_agent(
                     cfg, VERSION, log_file=_LOG_FILE, log_level=log_level,
                     update_status=_read_update_status(),
                     update_checker=choose_update,

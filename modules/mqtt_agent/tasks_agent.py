@@ -21,8 +21,7 @@ class TasksMixin:
         ts = datetime.datetime.now().strftime("%H:%M:%S")
         msg = f'{ts}: Task "{cmd}" started!'
         if log_on_run and self._terminal_output_enabled():
-            self.state_cache[self.terminal_output_topic] = msg
-            self.client.publish(self.terminal_output_topic, msg)
+            self.publish(self.terminal_output_topic, msg)
         if self.tty_output:
             print(self._gray(msg))
         if self.log_file is not None:
