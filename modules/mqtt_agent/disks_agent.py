@@ -37,13 +37,15 @@ class DisksMixin:
             }
 
             for key, unit in metrics.items():
+                ha_object_id = f"{self.device_slug}_{name}_used_space" if key == "used_space" else None
                 self._sensor_discovery(
                     f"disk_{name}_{key}",
                     sensor_names.get(key) or f"{name} {key.replace('_', ' ').title()}",
                     f"{base}/{key}",
                     unit=unit,
                     icon="mdi:harddisk",
-                    state_class="measurement"
+                    state_class="measurement",
+                    ha_object_id=ha_object_id,
                 )
 
             dev = d["dev"]
