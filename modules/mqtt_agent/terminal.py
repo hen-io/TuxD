@@ -8,6 +8,8 @@ from collections import deque
 
 TERMINAL_STOP_SENTINEL = "__tuxd_stop__"
 
+TERMINAL_CLEAR_SENTINEL = "__tuxd_clear__"
+
 
 class TerminalMixin:
     def _terminal_input_enabled(self):
@@ -218,6 +220,12 @@ class TerminalMixin:
                 continue
 
             self._terminal_cancel_event.clear()
+
+            if cmd.strip().lower() in ("clear", "reset"):
+                if self._terminal_output_enabled():
+                    self.publish(self.terminal_output_topic, TERMINAL_CLEAR_SENTINEL)
+                self.publish(self.terminal_input_topic, "")
+                continue
 
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, self._terminal_prompt(cmd))
