@@ -336,8 +336,17 @@ class ConfigAgentMixin:
             except OSError:
                 continue
             if last_mtime is not None and mtime != last_mtime:
-                print(f"TuxD: detected external change to {_CONFIG_FILE} - restarting now")
-                self._cfgnum_restart_instant()
+                msg = f"TuxD: detected external change to {_CONFIG_FILE} - restarting now"
+                print(msg)
+                try:
+                    if self._terminal_output_enabled():
+                        self.publish(self.terminal_output_topic, msg)
+                except Exception:
+                    pass
+                try:
+                    self._cfgnum_restart_instant()
+                except Exception as e:
+                    print(f"TuxD: restart after config change FAILED: {e!r}")
             last_mtime = mtime
 
     def init_config_texts(self):

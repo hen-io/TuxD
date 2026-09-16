@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.1.7"
+VERSION = "1.1.8"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -971,16 +971,6 @@ def _cleanup_stale_mqtt_discovery(cfg, timeout=5):
             pass
 
 
-def _sync_connection_mode_state(cfg, connection_mode):
-    db = _db_read()
-    last_mode = db.get("last_connection_mode")
-    if last_mode == "mqtt" and connection_mode == "direct":
-        _cleanup_stale_mqtt_discovery(cfg)
-    if last_mode != connection_mode:
-        db["last_connection_mode"] = connection_mode
-        _db_write(db)
-
-
 def restart_in(seconds=10):
     time.sleep(seconds)
     os.execv(sys.executable, [sys.executable] + sys.argv)
@@ -1271,7 +1261,8 @@ def main():
             status.write(c(f"Successfully tested connection to {label}!", GREEN, BOLD))
             time.sleep(.5)
 
-        _sync_connection_mode_state(cfg, connection_mode)
+        if is_direct:
+            _cleanup_stale_mqtt_discovery(cfg)
 
         try:
             from modules.mqtt_agent import build_agent
