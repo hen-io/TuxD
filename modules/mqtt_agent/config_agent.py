@@ -307,7 +307,7 @@ class ConfigAgentMixin:
             self.clear_discovery(timeout=5.0)
         except Exception:
             pass
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        self._hard_restart()
 
     def _cfgnum_schedule_restart(self):
         with self._cfgnum_restart_lock:

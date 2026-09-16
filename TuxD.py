@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -692,6 +692,16 @@ def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
             print(c("Restarting...", YELLOW, BOLD))
             print("")
         time.sleep(1)
+
+    except (urllib.error.HTTPError, urllib.error.URLError) as e:
+        mark_version_failed(str(new_version))
+        _write_update_status("Update failed (network)")
+        log_write(f"Update to {new_version} FAILED ({source_type} from {source_value}): {e!r} - network/HTTP error, nothing changed, continuing on current version.")
+
+        if enabled:
+            print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
+            print(c("Nothing was changed - continuing on the current version.", YELLOW, BOLD))
+        return
 
     except Exception as e:
         mark_version_failed(str(new_version))

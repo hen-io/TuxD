@@ -222,8 +222,6 @@ class HostUpdateMixin:
         except Exception:
             pass
 
-        try:
-            os.execv(sys.executable, [sys.executable] + sys.argv)
-        except Exception:
-            self._host_update_installing = False
-            self._set_host_update_progress(False)
+        self._host_update_installing = False
+        self._set_host_update_progress(False)
+        self._hard_restart()

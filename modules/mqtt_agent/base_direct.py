@@ -36,6 +36,9 @@ class _IncomingMsg:
 
 class HADirectBase:
 
+    _HEARTBEAT_INTERVAL = 5.0
+    _HEARTBEAT_TIMEOUT = 10.0
+
     def __init__(self, config, version, log_file=None, log_level="all"):
         if websockets is None:
             raise RuntimeError(
@@ -79,6 +82,17 @@ class HADirectBase:
         self._thread = None
         self._connected_event = threading.Event()
         self._auth_error = None
+        self._last_activity = 0.0
+
+    def _log(self, msg):
+        print(self._gray(msg) if self._use_color else msg)
+        if self.log_file is not None:
+            try:
+                ts = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.log_file.write(f"[{ts}] {msg}\n")
+                self.log_file.flush()
+            except Exception:
+                pass
 
     def _gray(self, text):
         if not self._use_color:
@@ -157,12 +171,22 @@ class HADirectBase:
                     self.refresh_discovery()
                     self._resend_all_state()
                     self._connected_event.set()
+                    self._last_activity = time.monotonic()
+                    self._log("Direct: connected to Home Assistant")
 
-                    async for raw in ws:
-                        self._handle_incoming(raw)
+                    heartbeat_task = asyncio.create_task(self._heartbeat_watchdog())
+                    try:
+                        async for raw in ws:
+                            self._last_activity = time.monotonic()
+                            self._handle_incoming(raw)
+                    finally:
+                        heartbeat_task.cancel()
+                        try:
+                            await heartbeat_task
+                        except (asyncio.CancelledError, Exception):
+                            pass
             except Exception as e:
-                if self.tty_output:
-                    print(self._gray(f"Direct: connection error: {e!r}"))
+                self._log(f"Direct: connection error: {e!r}")
                 self._ws = None
                 self._broker_lost = True
                 self._connected_event.set()
@@ -175,9 +199,30 @@ class HADirectBase:
                 await asyncio.sleep(self._retry_delay)
                 if self._stop_event.is_set():
                     break
-                if self.tty_output:
-                    print(self._gray(f"Direct: still disconnected after {self._retry_delay:.0f}s - restarting..."))
-                os.execv(sys.executable, [sys.executable] + sys.argv)
+                self._log(f"Direct: still disconnected after {self._retry_delay:.0f}s - restarting...")
+                self._hard_restart()
+
+    async def _heartbeat_watchdog(self):
+        try:
+            while True:
+                await asyncio.sleep(self._HEARTBEAT_INTERVAL)
+                if self._ws is None:
+                    return
+                try:
+                    await self._ws.send(json.dumps({"type": "ping"}))
+                except Exception:
+                    return
+                idle = time.monotonic() - self._last_activity
+                if idle > self._HEARTBEAT_TIMEOUT:
+                    self._log(
+                        f"Direct: no response from Home Assistant for over "
+                        f"{self._HEARTBEAT_TIMEOUT:.0f}s (connection looked open but "
+                        f"was not) - restarting..."
+                    )
+                    self._hard_restart()
+                    return
+        except asyncio.CancelledError:
+            pass
 
     def _handle_incoming(self, raw):
         try:
