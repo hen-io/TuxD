@@ -103,17 +103,17 @@ class SelfUpdateMixin:
         self.publish(f"{self.base_topic}/{oid}", _RELEASE_CHANNEL_LABELS[channel], retain=True)
         self._cfgnum_schedule_restart()
 
-    def _self_update_check(self):
+    def _self_update_check(self, force=False):
         if not callable(self._update_checker):
             return None, None, None, None
         try:
-            return self._update_checker()
+            return self._update_checker(force=force)
         except Exception:
             return None, None, None, None
 
-    def _publish_self_update_state(self):
+    def _publish_self_update_state(self, force=False):
         base = f"{self.base_topic}/self_update"
-        new_version, src_type, src_val, release_notes = self._self_update_check()
+        new_version, src_type, src_val, release_notes = self._self_update_check(force=force)
 
         state = {
             "installed_version": self.version,
@@ -140,7 +140,7 @@ class SelfUpdateMixin:
         self.publish(f"{self.base_topic}/self_update/state", json.dumps(state), retain=True)
 
     def handle_self_update_check(self):
-        threading.Thread(target=self._publish_self_update_state, daemon=True).start()
+        threading.Thread(target=lambda: self._publish_self_update_state(force=True), daemon=True).start()
 
     def self_update_loop(self):
         while not self._stop_event.is_set():
@@ -161,7 +161,7 @@ class SelfUpdateMixin:
 
     def _run_self_update_install(self):
         try:
-            new_version, src_type, src_val, _release_notes = self._self_update_check()
+            new_version, src_type, src_val, _release_notes = self._self_update_check(force=True)
             if not new_version or not src_type or not src_val:
                 return
             self._set_self_update_progress(True)

@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.2"
+VERSION = "1.2.4"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -460,7 +460,11 @@ def _mark_auto_update_checked():
     _db_write(data)
 
 
-def choose_update(release_channel="stable"):
+def choose_update(release_channel="stable", force=False):
+    if not force:
+        if time.time() - _last_auto_update_check() < _AUTO_UPDATE_CHECK_MIN_INTERVAL:
+            return None, None, None, None
+        _mark_auto_update_checked()
     prefer_latest = _read_upgrade_info_flag("extra_deps")
     v, url, release_notes = find_newer_release_github(prefer_latest=prefer_latest, release_channel=release_channel)
     if v and url and not is_version_recently_failed(v):
@@ -659,84 +663,126 @@ def _run_upgrade_hook(project_root: Path, enabled: bool):
         log_write(f"Upgrade hook failed to launch ({hook}): {e!r}")
 
 
-def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
+_UPDATE_MAX_ATTEMPTS = 3
+_UPDATE_RETRY_DELAY_SECONDS = 5
+
+
+def _attempt_update_once(new_version, source_type, source_value, enabled, rb):
     project_root = Path(__file__).resolve().parent
-    rb = _Rollback()
 
-    try:
-        if enabled:
-            print(c(f"Installing version {new_version}...", YELLOW, BOLD))
-            print("")
+    if enabled:
+        print(c(f"Installing version {new_version}...", YELLOW, BOLD))
+        print("")
+    time.sleep(1)
+
+    if source_type == "github":
+        with tempfile.TemporaryDirectory() as td:
+            td_path = Path(td)
+            tar_path = td_path / f"{new_version}.tar.gz"
+            extract_dir = td_path / "extract"
+            extract_dir.mkdir(parents=True, exist_ok=True)
+
+            _download_to_file(source_value, tar_path, timeout=DOWNLOAD_TIMEOUT)
+            _extract_tar(tar_path, extract_dir)
+
+            release_root = _find_release_root(extract_dir)
+            _apply_update_from_dir(release_root, enabled, rb)
+
+    else:
+        raise RuntimeError("Unknown update source")
+
+    if enabled:
         time.sleep(1)
+        print(c("Checking update integrity...", WHITE, DIM, BOLD))
+        time.sleep(3)
 
-        if source_type == "github":
-            with tempfile.TemporaryDirectory() as td:
-                td_path = Path(td)
-                tar_path = td_path / f"{new_version}.tar.gz"
-                extract_dir = td_path / "extract"
-                extract_dir.mkdir(parents=True, exist_ok=True)
+    ok = _integrity_check_dir_compileall(project_root)
+    if not ok:
+        raise RuntimeError("Installed integrity check failed (compileall)")
 
-                _download_to_file(source_value, tar_path, timeout=DOWNLOAD_TIMEOUT)
-                _extract_tar(tar_path, extract_dir)
+    clear_version_failed(new_version)
 
-                release_root = _find_release_root(extract_dir)
-                _apply_update_from_dir(release_root, enabled, rb)
+    _run_upgrade_hook(project_root, enabled)
 
-        else:
-            raise RuntimeError("Unknown update source")
-
-        if enabled:
-            time.sleep(1)
-            print(c("Checking update integrity...", WHITE, DIM, BOLD))
-            time.sleep(3)
-
-        ok = _integrity_check_dir_compileall(project_root)
-        if not ok:
-            raise RuntimeError("Installed integrity check failed (compileall)")
-
-        clear_version_failed(new_version)
-
-        _run_upgrade_hook(project_root, enabled)
-
-        if enabled:
-            print(c("Update applied successfully", GREEN, BOLD))
-            time.sleep(1)
-            print(c("Restarting...", YELLOW, BOLD))
-            print("")
+    if enabled:
+        print(c("Update applied successfully", GREEN, BOLD))
         time.sleep(1)
+        print(c("Restarting...", YELLOW, BOLD))
+        print("")
+    time.sleep(1)
 
-    except (urllib.error.HTTPError, urllib.error.URLError) as e:
-        mark_version_failed(str(new_version))
-        _write_update_status("Update failed (network)")
-        log_write(f"Update to {new_version} FAILED ({source_type} from {source_value}): {e!r} - network/HTTP error, nothing changed, continuing on current version.")
 
-        if enabled:
-            print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
-            print(c("Nothing was changed - continuing on the current version.", YELLOW, BOLD))
-        return
-
-    except Exception as e:
-        mark_version_failed(str(new_version))
-        _write_update_status("Update failed")
-        log_write(f"Update to {new_version} FAILED ({source_type} from {source_value}): {e!r} - rolling back.")
-
-        if enabled:
-            print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
-            print(c("Rolling back to previous version...", YELLOW, BOLD))
+def safe_apply_update_any(new_version, source_type, source_value, enabled=True):
+    for attempt in range(1, _UPDATE_MAX_ATTEMPTS + 1):
+        rb = _Rollback()
+        last_attempt = attempt == _UPDATE_MAX_ATTEMPTS
         try:
-            rb.restore()
-        finally:
+            _attempt_update_once(new_version, source_type, source_value, enabled, rb)
             rb.cleanup()
+            break
 
-        if enabled:
-            print(c("Rollback complete.", GREEN, BOLD))
-            print(c("Restarting...", YELLOW, BOLD))
-            print("")
-        time.sleep(2)
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            rb.cleanup()
+            if not last_attempt:
+                log_write(
+                    f"Update to {new_version} attempt {attempt}/{_UPDATE_MAX_ATTEMPTS} "
+                    f"failed (network): {e!r} - retrying in {_UPDATE_RETRY_DELAY_SECONDS}s"
+                )
+                if enabled:
+                    print(c(f"Attempt {attempt} failed:", RED, BOLD), c(repr(e), RED))
+                    print(c(f"Retrying in {_UPDATE_RETRY_DELAY_SECONDS}s...", YELLOW))
+                time.sleep(_UPDATE_RETRY_DELAY_SECONDS)
+                continue
 
-    finally:
-        rb.cleanup()
+            mark_version_failed(str(new_version))
+            _write_update_status("Update failed (network)")
+            log_write(
+                f"Update to {new_version} FAILED after {_UPDATE_MAX_ATTEMPTS} attempts "
+                f"({source_type} from {source_value}): {e!r} - continuing on current version."
+            )
+            if enabled:
+                print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
+                print(c("Nothing was changed - continuing on the current version.", YELLOW, BOLD))
+            return
+
+        except Exception as e:
+            if not last_attempt:
+                try:
+                    rb.restore()
+                finally:
+                    rb.cleanup()
+                log_write(
+                    f"Update to {new_version} attempt {attempt}/{_UPDATE_MAX_ATTEMPTS} "
+                    f"failed: {e!r} - retrying in {_UPDATE_RETRY_DELAY_SECONDS}s"
+                )
+                if enabled:
+                    print(c(f"Attempt {attempt} failed:", RED, BOLD), c(repr(e), RED))
+                    print(c(f"Retrying in {_UPDATE_RETRY_DELAY_SECONDS}s...", YELLOW))
+                time.sleep(_UPDATE_RETRY_DELAY_SECONDS)
+                continue
+
+            mark_version_failed(str(new_version))
+            _write_update_status("Update failed")
+            log_write(
+                f"Update to {new_version} FAILED after {_UPDATE_MAX_ATTEMPTS} attempts "
+                f"({source_type} from {source_value}): {e!r} - rolling back."
+            )
+
+            if enabled:
+                print(c("Update FAILED:", RED, BOLD), c(repr(e), RED))
+                print(c("Rolling back to previous version...", YELLOW, BOLD))
+            try:
+                rb.restore()
+            finally:
+                rb.cleanup()
+
+            if enabled:
+                print(c("Rollback complete.", GREEN, BOLD))
+                print(c("Restarting...", YELLOW, BOLD))
+                print("")
+            time.sleep(2)
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+            return
 
     self_path = Path(sys.argv[0]) if sys.argv else None
     if self_path is not None:
@@ -1232,7 +1278,7 @@ def main():
         if checked_now:
             _mark_auto_update_checked()
             new_version, src_type, src_val, _release_notes = choose_update(
-                release_channel=device_cfg.get("self_update_release_channel", "stable")
+                release_channel=device_cfg.get("self_update_release_channel", "stable"), force=True
             )
         else:
             new_version, src_type, src_val, _release_notes = None, None, None, None
@@ -1328,8 +1374,9 @@ def main():
                 agent = build_agent(
                     cfg, VERSION, log_file=_LOG_FILE, log_level=log_level,
                     update_status=_read_update_status(),
-                    update_checker=lambda: choose_update(
-                        release_channel=(cfg.get("device") or {}).get("self_update_release_channel", "stable")
+                    update_checker=lambda force=False: choose_update(
+                        release_channel=(cfg.get("device") or {}).get("self_update_release_channel", "stable"),
+                        force=force,
                     ),
                     update_applier=lambda nv, st, sv: safe_apply_update_any(nv, st, sv, enabled=False),
                 )
