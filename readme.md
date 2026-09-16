@@ -1,7 +1,12 @@
-![TuXD](https://raw.githubusercontent.com/hen-io/TuxD/refs/heads/main/bin/logo.png)
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="logo.png">
+    <img src="logo.png" alt="TuxD" height="250em">
+  </picture>
+</p>
 ## 
 
-**<center> A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.</center>**
+**<center> A lightweight agent to monitor and manage \*nix systems via Home Assistant over End-to-End encrypted WebSocket or MQTT.</center>**
 
 This readme is still very much a WIP
 
