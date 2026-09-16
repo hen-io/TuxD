@@ -1,4 +1,5 @@
 import getpass
+import os
 import select
 import subprocess
 import threading
@@ -149,6 +150,7 @@ class TerminalMixin:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                cwd=os.path.expanduser("~"),
             )
         except Exception as e:
             on_line(f"ERR: {e}")
