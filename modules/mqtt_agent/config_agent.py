@@ -294,6 +294,7 @@ class ConfigAgentMixin:
                 lst[idx][path_info["key"]] = value
 
     def _cfgnum_restart(self):
+        print("TuxD: restarting now due to a configuration change...")
         try:
             if self._terminal_output_enabled():
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
@@ -316,10 +317,18 @@ class ConfigAgentMixin:
             self._cfgnum_restart_timer.daemon = True
             self._cfgnum_restart_timer.start()
 
+    def _cfgnum_restart_instant(self):
+        with self._cfgnum_restart_lock:
+            if self._cfgnum_restart_timer is not None:
+                self._cfgnum_restart_timer.cancel()
+                self._cfgnum_restart_timer = None
+        self._cfgnum_restart()
+
     def config_file_watch_loop(self):
         try:
             last_mtime = os.path.getmtime(_CONFIG_FILE)
-        except OSError:
+        except OSError as e:
+            print(f"TuxD: config_file_watch_loop could not read {_CONFIG_FILE}: {e!r}")
             last_mtime = None
         while not self._stop_event.wait(timeout=5.0):
             try:
@@ -327,7 +336,8 @@ class ConfigAgentMixin:
             except OSError:
                 continue
             if last_mtime is not None and mtime != last_mtime:
-                self._cfgnum_schedule_restart()
+                print(f"TuxD: detected external change to {_CONFIG_FILE} - restarting now")
+                self._cfgnum_restart_instant()
             last_mtime = mtime
 
     def init_config_texts(self):
@@ -542,14 +552,6 @@ class ConfigAgentMixin:
                     {"type": "dict", "keys": ["lm_sensors", "sensors", skey, "enabled"]},
                 )
 
-        for skey, sval in ((cfg.get("commands") or {}).get("status") or {}).items():
-            if isinstance(sval, dict) and "enabled" in sval:
-                add(
-                    f"status_{_slug(skey)}",
-                    f"{skey.replace('_', ' ').title()} State",
-                    sval["enabled"],
-                    {"type": "dict", "keys": ["commands", "status", skey, "enabled"]},
-                )
 
 
         t_out = (cfg.get("terminal") or {}).get("terminal_output")
