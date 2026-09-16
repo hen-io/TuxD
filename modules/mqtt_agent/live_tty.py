@@ -153,11 +153,11 @@ class LiveTtyMixin:
 
 
     def publish_tty_data(self, session_id, chunk: bytes):
-        self._send_nowait({
+        self._send_wait({
             "type": "tty_data",
             "session": session_id,
             "data": base64.b64encode(chunk).decode("ascii"),
-        })
+        }, timeout=2.0)
 
     def publish_tty_exit(self, session_id, code):
-        self._send_nowait({"type": "tty_exit", "session": session_id, "code": code})
+        self._send_wait({"type": "tty_exit", "session": session_id, "code": code}, timeout=2.0)
