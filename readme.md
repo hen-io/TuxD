@@ -1,4 +1,4 @@
-![TuXD](https://raw.githubusercontent.com/hen-io/TuxD/refs/heads/main/bin/banner.png)
+![TuXD](https://raw.githubusercontent.com/hen-io/TuxD/refs/heads/main/bin/logo.png)
 ## 
 
 **<center> A lightweight agent to monitor and manage \*nix systems via Home Assistant over MQTT.</center>**
