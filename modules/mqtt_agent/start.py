@@ -297,6 +297,10 @@ class TuxDAgentMixin(
             self.handle_self_update_check()
             return
 
+        if topic == f"{self.base_topic}/self_update/install_from_url/set":
+            self.handle_self_update_install_from_url(payload)
+            return
+
         if topic == f"{self.base_topic}/cfgselect_self_update_release_channel/set":
             self.handle_release_channel_select(topic, payload)
             return
@@ -325,6 +329,7 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/host_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/check/set")
+        self.client.subscribe(f"{self.base_topic}/self_update/install_from_url/set")
         self.client.subscribe(f"{self.base_topic}/cfgselect_self_update_release_channel/set")
 
         if on_ready is not None:

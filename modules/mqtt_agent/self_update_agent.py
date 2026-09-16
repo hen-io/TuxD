@@ -13,7 +13,7 @@ _RELEASE_CHANNEL_BY_LABEL = {v: k for k, v in _RELEASE_CHANNEL_LABELS.items()}
 class SelfUpdateMixin:
     def init_self_update(self):
         device_cfg = self.config.get("device", {}) or {}
-        self._self_update_interval = float(device_cfg.get("self_update_check_interval", 21600))
+        self._self_update_interval = float(device_cfg.get("self_update_check_interval", 300))
         self._self_update_allow_install = bool(device_cfg.get("self_update_allow_install", True))
         self._self_update_installing = False
         self._self_update_last_state = None
@@ -169,6 +169,30 @@ class SelfUpdateMixin:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"Installing TuxD {new_version}...")
             self._update_applier(new_version, src_type, src_val)
+        except Exception:
+            self._set_self_update_progress(False)
+        finally:
+            self._self_update_installing = False
+
+    def handle_self_update_install_from_url(self, url):
+        if not self._self_update_allow_install or self._self_update_installing:
+            return
+        if not callable(self._update_applier):
+            return
+        url = (url or "").strip()
+        if not url:
+            return
+
+        self._self_update_installing = True
+        threading.Thread(target=self._run_self_update_install_from_url, args=(url,), daemon=True).start()
+
+    def _run_self_update_install_from_url(self, url):
+        try:
+            self._set_self_update_progress(True)
+            self.set_error(True, "TuxD update installing (offline tarball), restarting")
+            if self._terminal_output_enabled():
+                self.publish(self.terminal_output_topic, f"Installing TuxD from {url}...")
+            self._update_applier("offline-tarball", "url", url)
         except Exception:
             self._set_self_update_progress(False)
         finally:

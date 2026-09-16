@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.4"
+VERSION = "1.2.5"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -444,7 +444,7 @@ def clear_all_failed_markers():
         _db_write(data)
 
 
-_AUTO_UPDATE_CHECK_MIN_INTERVAL = 300
+_AUTO_UPDATE_CHECK_MIN_INTERVAL = 60
 
 
 def _last_auto_update_check() -> float:
@@ -675,7 +675,7 @@ def _attempt_update_once(new_version, source_type, source_value, enabled, rb):
         print("")
     time.sleep(1)
 
-    if source_type == "github":
+    if source_type in ("github", "url"):
         with tempfile.TemporaryDirectory() as td:
             td_path = Path(td)
             tar_path = td_path / f"{new_version}.tar.gz"
