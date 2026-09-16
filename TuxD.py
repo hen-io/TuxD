@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.1.6"
+VERSION = "1.1.7"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -29,7 +29,6 @@ GITHUB_TIMEOUT = 8
 DOWNLOAD_TIMEOUT = 60
 
 GITHUB_REPO = "hen-io/TuxD"
-GITHUB_ASSET_SUFFIX = ".tar.gz"
 
 FAILED_UPDATE_RETRY_SECONDS = 3600
 
@@ -260,12 +259,8 @@ def version_tuple(v: str):
     return tuple(int(p) for p in parts) if parts else (0,)
 
 
+_RELEASE_BRANCHES = {"stable": "main", "rc": "RC", "beta": "BETA"}
 _CHANNEL_RANK = {"beta": 0, "rc": 1, "stable": 2}
-_CHANNEL_VISIBILITY = {
-    "stable": {"stable"},
-    "rc": {"stable", "rc"},
-    "beta": {"stable", "rc", "beta"},
-}
 _RELEASE_TAG_RE = re.compile(r'^(\d+(?:\.\d+)*)(?:-(RC|BETA)-(\d+))?$', re.IGNORECASE)
 
 
@@ -287,14 +282,6 @@ def channel_sort_key(v: str):
     return base, _CHANNEL_RANK[channel], num
 
 
-def is_visible_on_channel(v: str, selected_channel: str) -> bool:
-    parsed = parse_release_channel(v)
-    if parsed is None:
-        return True
-    _, channel, _ = parsed
-    return channel in _CHANNEL_VISIBILITY.get(selected_channel, _CHANNEL_VISIBILITY["stable"])
-
-
 def _read_upgrade_info_flag(name: str) -> bool:
     try:
         path = Path(__file__).resolve().parent / "bin" / "upgrade" / "upgrade.info"
@@ -309,29 +296,6 @@ def _read_upgrade_info_flag(name: str) -> bool:
     except Exception:
         pass
     return False
-
-
-def _select_update_target(current_version, available_versions, exclude=None, prefer_latest=False):
-    exclude = exclude or (lambda v: False)
-    pool = [v for v in available_versions if not exclude(v)]
-    if not pool:
-        return None
-
-    cur = channel_sort_key(current_version)
-
-    if prefer_latest:
-        latest = max(pool, key=channel_sort_key)
-        return latest if channel_sort_key(latest) != cur else None
-
-    newer = sorted((v for v in pool if channel_sort_key(v) > cur), key=channel_sort_key)
-    if newer:
-        return newer[0]
-
-    by_version = sorted(pool, key=channel_sort_key)
-    latest = by_version[-1]
-    if channel_sort_key(latest) != cur:
-        return latest
-    return None
 
 
 def _github_token():
@@ -367,62 +331,52 @@ def _fetch_json(url: str, timeout: int):
     return json.loads(data.decode("utf-8-sig", errors="replace"))
 
 
+def _fetch_text(url: str, timeout: int) -> str:
+    sep = '&' if '?' in url else '?'
+    url = f"{url}{sep}_={int(time.time())}"
+    headers = {
+        "User-Agent": "TuxD-Updater",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+    }
+    if _is_github_url(url):
+        token = _github_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        data = resp.read()
+    return data.decode("utf-8-sig", errors="replace")
+
+
+_VERSION_ASSIGN_RE = re.compile(r'^VERSION\s*=\s*["\']([^"\']+)["\']', re.MULTILINE)
+
+
 def find_newer_release_github(prefer_latest=False, release_channel="stable"):
     if not GITHUB_REPO:
         return None, None, None
 
-    url = f"https://api.github.com/repos/{GITHUB_REPO}/releases?per_page=100"
+    branch = _RELEASE_BRANCHES.get(release_channel, "main")
+    raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{branch}/TuxD.py"
     try:
-        releases = _fetch_json(url, timeout=GITHUB_TIMEOUT)
+        text = _fetch_text(raw_url, timeout=GITHUB_TIMEOUT)
     except Exception as e:
-        log_write(f"GitHub update check failed ({url}): {e}")
+        log_write(f"GitHub update check failed ({raw_url}): {e}")
         return None, None, None
 
-    if not isinstance(releases, list):
+    m = _VERSION_ASSIGN_RE.search(text)
+    if not m:
+        return None, None, None
+    remote_version = m.group(1).strip()
+
+    if channel_sort_key(remote_version) <= channel_sort_key(VERSION):
+        return None, None, None
+    if is_version_recently_failed(remote_version):
         return None, None, None
 
-    by_version = {}
-    for rel in releases:
-        tag = str(rel.get("tag_name", "")).strip()
-        v = tag[1:] if tag[:1] in ("v", "V") else tag
-        if not v or parse_release_channel(v) is None:
-            continue
-        if not is_visible_on_channel(v, release_channel):
-            continue
-
-        download_url = ""
-        for asset in rel.get("assets") or []:
-            name = str(asset.get("name", ""))
-            if name.endswith(GITHUB_ASSET_SUFFIX):
-                download_url = str(asset.get("browser_download_url", "")).strip()
-                break
-
-        if not download_url:
-            download_url = str(rel.get("tarball_url", "")).strip()
-
-        if download_url:
-            by_version[v] = (
-                download_url,
-                str(rel.get("body") or "").strip(),
-                str(rel.get("html_url") or "").strip(),
-            )
-
-    target = _select_update_target(VERSION, list(by_version.keys()), exclude=is_version_recently_failed, prefer_latest=prefer_latest)
-    if target and by_version.get(target):
-        download_url, _, target_html_url = by_version[target]
-
-        cur_v = channel_sort_key(VERSION)
-        newer = [v for v in by_version if channel_sort_key(v) > cur_v]
-        newer.sort(key=channel_sort_key, reverse=True)
-
-        chunks = [f"{v}\n{by_version[v][1]}" for v in newer if by_version[v][1]]
-        summary = "\n\n".join(chunks)
-        release_url = by_version[newer[0]][2] if newer else target_html_url
-
-        release_notes = {"summary": summary, "url": release_url} if (summary or release_url) else None
-        return target, download_url, release_notes
-
-    return None, None, None
+    download_url = f"https://github.com/{GITHUB_REPO}/archive/refs/heads/{branch}.tar.gz"
+    release_notes = {"summary": "", "url": f"https://github.com/{GITHUB_REPO}/commits/{branch}"}
+    return remote_version, download_url, release_notes
 
 
 _DB_FILE = "database.json"
