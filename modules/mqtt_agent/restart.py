@@ -4,6 +4,8 @@ import datetime
 import time
 import threading
 
+from .base_direct import HADirectBase
+
 
 class RestartMixin:
     def register_restart_button(self):
@@ -14,13 +16,16 @@ class RestartMixin:
             icon="mdi:restart",
             entity_category="diagnostic"
         )
-        self._button_discovery(
-            "refresh_agent",
-            "Refresh TuxD Entities",
-            f"{self.base_topic}/refresh/set",
-            icon="mdi:refresh",
-            entity_category="diagnostic"
-        )
+        if isinstance(self, HADirectBase):
+            self.publish(self._discovery_topic("button", "refresh_agent"), "", retain=True)
+        else:
+            self._button_discovery(
+                "refresh_agent",
+                "Refresh TuxD Entities",
+                f"{self.base_topic}/refresh/set",
+                icon="mdi:refresh",
+                entity_category="diagnostic"
+            )
         self._button_discovery(
             "force_poll_agent",
             "Force Refresh All Sensors",
