@@ -141,6 +141,12 @@ class HostUpdateMixin:
         self.publish(f"{base}/state_attributes", json.dumps(attrs), retain=True)
         return True
 
+    def handle_host_update_check(self):
+        cfg = self.config.get("host_update", {}) or {}
+        if not cfg.get("enabled", False):
+            return
+        threading.Thread(target=self._publish_host_update_state, daemon=True).start()
+
     def _set_host_update_progress(self, in_progress):
         if not self._host_update_last_state:
             return

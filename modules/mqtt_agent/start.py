@@ -289,6 +289,10 @@ class TuxDAgentMixin(
             self.handle_host_update_install()
             return
 
+        if topic == f"{self.base_topic}/host_update/check/set":
+            self.handle_host_update_check()
+            return
+
         if topic == f"{self.base_topic}/self_update/set":
             self.handle_self_update_install()
             return
@@ -327,6 +331,7 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/cfgtxt/+/set")
         self.client.subscribe(f"{self.base_topic}/docker/update/+/set")
         self.client.subscribe(f"{self.base_topic}/host_update/set")
+        self.client.subscribe(f"{self.base_topic}/host_update/check/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/check/set")
         self.client.subscribe(f"{self.base_topic}/self_update/install_from_url/set")
