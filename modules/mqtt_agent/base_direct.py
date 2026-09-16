@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import ssl
 import sys
 import threading
@@ -154,6 +155,7 @@ class HADirectBase:
                     self._broker_lost = False
 
                     self.refresh_discovery()
+                    self._resend_all_state()
                     self._connected_event.set()
 
                     async for raw in ws:
@@ -164,9 +166,18 @@ class HADirectBase:
                 self._ws = None
                 self._broker_lost = True
                 self._connected_event.set()
+                try:
+                    self.close_all_tty_sessions()
+                except Exception:
+                    pass
                 if self._stop_event.is_set():
                     break
                 await asyncio.sleep(self._retry_delay)
+                if self._stop_event.is_set():
+                    break
+                if self.tty_output:
+                    print(self._gray(f"Direct: still disconnected after {self._retry_delay:.0f}s - restarting..."))
+                os.execv(sys.executable, [sys.executable] + sys.argv)
 
     def _handle_incoming(self, raw):
         try:
@@ -183,6 +194,20 @@ class HADirectBase:
                     print(self._gray(f"Direct: on_message failed for {key}: {e!r}"))
         elif msg.get("type") == "ping":
             self._send_nowait({"type": "pong"})
+        elif msg.get("type") == "tty_open":
+            self.open_tty_session(msg.get("session"), msg.get("cols", 80), msg.get("rows", 24))
+        elif msg.get("type") == "tty_input":
+            self.write_tty_session(msg.get("session"), msg.get("data", ""))
+        elif msg.get("type") == "tty_resize":
+            self.resize_tty_session(msg.get("session"), msg.get("cols", 80), msg.get("rows", 24))
+        elif msg.get("type") == "tty_close":
+            self.close_tty_session(msg.get("session"))
+
+    def _resend_all_state(self):
+        for topic, payload in list(self.state_cache.items()):
+            if topic.startswith("homeassistant/") and topic.endswith("/config"):
+                continue
+            self._send_nowait({"type": "state", "key": topic, "value": payload, "retain": True})
 
     def _send_nowait(self, obj):
         if self._loop is None or self._ws is None:

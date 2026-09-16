@@ -275,6 +275,15 @@ terminal:
     max_queue: 50
     post_interval: 0.25
     max_runtime: 60
+  # A real interactive shell (PTY) for fullscreen apps like top/htop/vim,
+  # streamed live with full ANSI colors - connection_mode: direct only, and
+  # a materially bigger capability than terminal_input above (not gated by
+  # command_filter/input_queue_limit at all), so it's off by default and
+  # independent of terminal_input.enabled.
+  live_tty:
+    enabled: false
+    shell: ""
+    max_sessions: 2
 
 #################################
 # Commands                      #

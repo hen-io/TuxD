@@ -6,6 +6,7 @@ import datetime
 from .base import HAMQTTBase
 from .base_direct import HADirectBase
 from .terminal import TerminalMixin
+from .live_tty import LiveTtyMixin
 from .restart import RestartMixin
 from .status_commands import StatusCommandsMixin
 from .components import ComponentSensorsMixin
@@ -27,6 +28,7 @@ from .system_status_agent import SystemStatusMixin
 
 class TuxDAgentMixin(
     TerminalMixin,
+    LiveTtyMixin,
     RestartMixin,
     StatusCommandsMixin,
     DefaultEntitiesMixin,
@@ -55,6 +57,7 @@ class TuxDAgentMixin(
         self._startup_time = datetime.datetime.now().strftime("%H:%M:%S %d.%m.%y")
 
         self.init_terminal()
+        self.init_live_tty()
         self.init_status()
         self.init_default_entities()
         self.init_components()
@@ -392,6 +395,10 @@ class TuxDAgentMixin(
 
     def stop(self):
         self._stop_event.set()
+        try:
+            self.close_all_tty_sessions()
+        except Exception:
+            pass
         try:
             self.client.loop_stop()
         except Exception:
