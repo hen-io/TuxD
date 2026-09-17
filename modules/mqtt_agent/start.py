@@ -280,6 +280,10 @@ class TuxDAgentMixin(
             self.handle_config_text(topic, payload)
             return
 
+        if topic == f"{self.base_topic}/config/get" or topic == f"{self.base_topic}/config/set":
+            self.handle_config_request(payload)
+            return
+
         if topic.startswith(f"{self.base_topic}/docker/update/") and topic.endswith("/set"):
             self.handle_docker_update_install(topic)
             return

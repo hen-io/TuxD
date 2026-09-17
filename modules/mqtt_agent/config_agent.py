@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import tempfile
 import yaml
 import threading
 import time
@@ -17,6 +18,59 @@ _CONFIG_FILE = "tuxd.conf"
 class ConfigAgentMixin:
     def _config_entity_id(self, domain, key):
         return f"{domain}.{self.device_slug}_config_{key}"
+
+    def handle_config_request(self, payload):
+        try:
+            request = json.loads(payload or "{}")
+            request_id = str(request.get("request_id") or "")
+            action = request.get("action")
+            if not request_id or action not in ("get", "set"):
+                return
+
+            if action == "get":
+                with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    content = f.read()
+                self._send_config_response(request_id, True, content=content)
+                return
+
+            content = request.get("content")
+            if not isinstance(content, str) or len(content) > 1024 * 1024:
+                self._send_config_response(request_id, False, error="Configuration is missing or too large")
+                return
+            parsed = yaml.safe_load(content)
+            if not isinstance(parsed, dict):
+                self._send_config_response(request_id, False, error="tuxd.conf must contain a YAML mapping")
+                return
+
+            mode = os.stat(_CONFIG_FILE).st_mode if os.path.exists(_CONFIG_FILE) else 0o600
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", dir=".", prefix=".tuxd.conf.", delete=False
+            ) as tmp:
+                tmp.write(content)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+                temp_path = tmp.name
+            os.chmod(temp_path, mode & 0o777)
+            os.replace(temp_path, _CONFIG_FILE)
+            self._send_config_response(request_id, True)
+        except Exception as e:
+            try:
+                if "temp_path" in locals():
+                    os.unlink(temp_path)
+            except Exception:
+                pass
+            self._send_config_response(request_id, False, error=str(e))
+
+    def _send_config_response(self, request_id, ok, content=None, error=None):
+        sender = getattr(self, "_send_wait", None)
+        if not callable(sender):
+            return
+        message = {"type": "config_response", "request_id": request_id, "ok": bool(ok)}
+        if content is not None:
+            message["content"] = content
+        if error:
+            message["error"] = error[:500]
+        sender(message, timeout=5.0)
 
     def _load_fresh_config(self):
         try:
