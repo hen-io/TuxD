@@ -99,18 +99,24 @@ class LiveTtyMixin:
         if not info:
             return
         try:
-            os.kill(info["pid"], signal.SIGTERM)
+            os.killpg(info["pid"], signal.SIGTERM)
         except Exception:
-            return
+            try:
+                os.kill(info["pid"], signal.SIGTERM)
+            except Exception:
+                return
 
         def _force_kill():
             with self._tty_sessions_lock:
                 still_open = session_id in self._tty_sessions
             if still_open:
                 try:
-                    os.kill(info["pid"], signal.SIGKILL)
+                    os.killpg(info["pid"], signal.SIGKILL)
                 except Exception:
-                    pass
+                    try:
+                        os.kill(info["pid"], signal.SIGKILL)
+                    except Exception:
+                        pass
 
         threading.Timer(3.0, _force_kill).start()
 
