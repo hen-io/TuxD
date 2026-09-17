@@ -19,7 +19,7 @@ class LiveTtyMixin:
         return val if isinstance(val, dict) else {}
 
     def _live_tty_enabled(self):
-        return bool(self._live_tty_cfg().get("enabled", False))
+        return bool(self._live_tty_cfg().get("enabled", True))
 
 
     def open_tty_session(self, session_id, cols, rows):

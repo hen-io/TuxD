@@ -278,10 +278,10 @@ terminal:
   # A real interactive shell (PTY) for fullscreen apps like top/htop/vim,
   # streamed live with full ANSI colors - connection_mode: direct only, and
   # a materially bigger capability than terminal_input above (not gated by
-  # command_filter/input_queue_limit at all), so it's off by default and
+  # command_filter/input_queue_limit at all), so it's on by default and
   # independent of terminal_input.enabled.
   live_tty:
-    enabled: false
+    enabled: true
     shell: ""
     max_sessions: 2
 
