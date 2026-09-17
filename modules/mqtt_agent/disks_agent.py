@@ -37,7 +37,12 @@ class DisksMixin:
             }
 
             for key, unit in metrics.items():
-                ha_object_id = f"{self.device_slug}__{name}_storage_used" if key == "used_space" else None
+                if key == "used_space":
+                    ha_object_id = f"{self.device_slug}__{name}_storage_used"
+                elif key == "used_space_gb":
+                    ha_object_id = f"{self.device_slug}_{name}_storage_used_gb"
+                else:
+                    ha_object_id = None
                 self._sensor_discovery(
                     f"disk_{name}_{key}",
                     sensor_names.get(key) or f"{name} {key.replace('_', ' ').title()}",

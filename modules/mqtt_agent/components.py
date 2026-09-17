@@ -53,6 +53,7 @@ class ComponentSensorsMixin:
                 f"{self.base_topic}/memory_used_percent",
                 unit="%",
                 icon="mdi:memory",
+                ha_object_id=f"{self.device_slug}_memory_used_mb",
                 state_class="measurement"
             )
 
