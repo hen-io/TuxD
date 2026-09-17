@@ -63,7 +63,6 @@ class ComponentSensorsMixin:
                 f"{self.base_topic}/iowait",
                 unit="%",
                 icon="mdi:timer-sand",
-                ha_object_id=f"{self.device_slug}_iowait",
                 state_class="measurement"
             )
             self.publish(f"{self.base_topic}/iowait", 0)

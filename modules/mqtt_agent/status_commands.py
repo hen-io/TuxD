@@ -32,7 +32,6 @@ class StatusCommandsMixin:
                 icon=cfg.get("icon") or "mdi:information-outline",
                 attributes_topic=attr_topic,
                 device_class=cfg.get("device_class"),
-                ha_object_id=f"{self.device_slug}_{_slug(custom_name)}" if custom_name else None,
             )
 
     def run_status_commands_loop(self):

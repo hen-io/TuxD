@@ -51,7 +51,6 @@ class LMSensorsMixin:
                     f"{self.base_topic}/lm_avg_temp",
                     unit=avg_unit,
                     icon=avg_icon,
-                    ha_object_id=f"{self.device_slug}_average_temp",
                     state_class="measurement",
                 )
             return

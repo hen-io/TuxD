@@ -51,7 +51,6 @@ class HostUpdateMixin:
             f"{base}/package_versions",
             icon="mdi:format-list-bulleted",
             entity_category="diagnostic",
-            ha_object_id=f"{self.device_slug}_new_package_version_available",
         )
 
         if not self._host_update_installing and self._host_update_last_state is None:

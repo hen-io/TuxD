@@ -83,8 +83,7 @@ class TuxDAgentMixin(
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,
         }
-        if ha_object_id:
-            payload["default_entity_id"] = f"sensor.{ha_object_id}"
+        payload["default_entity_id"] = f"sensor.{ha_object_id or object_id}"
         if state_class:
             payload["state_class"] = state_class
         if unit:
@@ -113,6 +112,7 @@ class TuxDAgentMixin(
             "payload_on": "ON",
             "payload_off": "OFF",
         }
+        payload["default_entity_id"] = f"binary_sensor.{object_id}"
         if device_class:
             payload["device_class"] = device_class
         if icon:
@@ -144,8 +144,7 @@ class TuxDAgentMixin(
             payload["icon"] = icon
         if entity_category:
             payload["entity_category"] = entity_category
-        if ha_object_id:
-            payload["default_entity_id"] = f"update.{ha_object_id}"
+        payload["default_entity_id"] = f"update.{ha_object_id or object_id}"
         if attributes_topic:
             payload["json_attributes_topic"] = attributes_topic
 
@@ -171,8 +170,7 @@ class TuxDAgentMixin(
             payload["icon"] = icon
         if entity_category:
             payload["entity_category"] = entity_category
-        if ha_object_id:
-            payload["default_entity_id"] = f"text.{ha_object_id}"
+        payload["default_entity_id"] = f"text.{ha_object_id or object_id}"
 
         self.publish(
             self._discovery_topic("text", object_id),
@@ -187,6 +185,7 @@ class TuxDAgentMixin(
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,
         }
+        payload["default_entity_id"] = f"button.{object_id}"
         if icon:
             payload["icon"] = icon
         if entity_category:

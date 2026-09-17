@@ -31,7 +31,6 @@ class SelfUpdateMixin:
             command_topic=command_topic,
             icon="mdi:linux",
             entity_category="diagnostic",
-            ha_object_id=f"{self.device_slug}_tuxd",
         )
 
         self._button_discovery(

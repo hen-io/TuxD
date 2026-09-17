@@ -122,7 +122,6 @@ class DockerMixin:
             command_topic=command_topic,
             icon="mdi:docker",
             entity_category="diagnostic",
-            ha_object_id=f"{self.device_slug}_container_{slug}",
         )
 
         if slug not in self._docker_installing:
@@ -270,7 +269,6 @@ class DockerMixin:
                 unit=unit,
                 icon=icon,
                 state_class="measurement",
-                ha_object_id=f"{self.device_slug}_container_{slug}_{key}",
             )
 
     def _register_docker_stat_container(self, cname, scfg):
