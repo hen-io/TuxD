@@ -23,8 +23,13 @@ def entity_object_id(object_id):
     object_id = str(object_id)
     for prefix in _ENTITY_COMPONENT_PREFIXES:
         if object_id.startswith(prefix):
-            return object_id[len(prefix):]
-    return object_id
+            object_id = object_id[len(prefix):]
+            break
+    return re.sub(
+        r"_(?:bytes?|gb|kb|mb|mbps|pct|percent|ms|seconds?|minutes?|hours?)$",
+        "",
+        object_id,
+    )
 
 
 def run_cmd(cmd: str, env=None):
