@@ -1,7 +1,7 @@
 import json
 import datetime
 import threading
-from .base import run_cmd
+from .base import entity_object_id, run_cmd
 
 
 class SelectMixin:
@@ -30,7 +30,7 @@ class SelectMixin:
                 "options": option_names,
                 "unique_id": f"{self.config['device']['name']}_{obj_id}",
                 "device": self.device_info,
-                "default_entity_id": f"select.{self.device_slug}_{obj_id}",
+                "default_entity_id": f"select.{self.device_slug}_{entity_object_id(obj_id)}",
             }
             if s.get("icon"):
                 payload["icon"] = s["icon"]

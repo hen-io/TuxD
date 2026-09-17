@@ -12,6 +12,21 @@ def slugify(s):
     return s.strip("_")
 
 
+_ENTITY_COMPONENT_PREFIXES = (
+    "builtin_", "custom_button_", "custom_sensor_", "disk_", "docker_",
+    "lag_monitor_", "log_sensor_", "net_", "network_", "select_",
+    "self_update_", "status_", "system_", "terminal_",
+)
+
+
+def entity_object_id(object_id):
+    object_id = str(object_id)
+    for prefix in _ENTITY_COMPONENT_PREFIXES:
+        if object_id.startswith(prefix):
+            return object_id[len(prefix):]
+    return object_id
+
+
 def run_cmd(cmd: str, env=None):
     if not cmd or cmd.strip() == "":
         return ""

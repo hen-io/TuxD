@@ -251,7 +251,4 @@ class TerminalMixin:
             with self.busy(f"terminal: {cmd}"):
                 self._stream_cmd(cmd, _on_line, max_runtime)
 
-            if published == 0 and self._terminal_output_enabled():
-                self.publish(self.terminal_output_topic, "")
-
             self.publish(self.terminal_input_topic, "")
