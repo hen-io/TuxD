@@ -37,11 +37,6 @@ class LiveTtyMixin:
 
         shell = (self._live_tty_cfg().get("shell") or "").strip() or os.environ.get("SHELL") or "/bin/bash"
 
-        home_dir = os.path.expanduser("~")
-        term_value = self._tty_pick_term()
-        child_env = dict(os.environ)
-        child_env["TERM"] = term_value
-
         try:
             pid, master_fd = pty.fork()
         except Exception:
@@ -50,8 +45,10 @@ class LiveTtyMixin:
 
         if pid == 0:
             try:
-                os.chdir(home_dir)
-                os.execvpe(shell, [shell], child_env)
+                os.chdir(os.path.expanduser("~"))
+                env = dict(os.environ)
+                env["TERM"] = self._tty_pick_term()
+                os.execvpe(shell, [shell], env)
             except Exception:
                 os._exit(1)
             return
@@ -153,11 +150,11 @@ class LiveTtyMixin:
 
 
     def publish_tty_data(self, session_id, chunk: bytes):
-        self._send_wait({
+        self._send_nowait({
             "type": "tty_data",
             "session": session_id,
             "data": base64.b64encode(chunk).decode("ascii"),
-        }, timeout=2.0)
+        })
 
     def publish_tty_exit(self, session_id, code):
-        self._send_wait({"type": "tty_exit", "session": session_id, "code": code}, timeout=2.0)
+        self._send_nowait({"type": "tty_exit", "session": session_id, "code": code})
