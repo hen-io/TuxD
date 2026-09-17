@@ -30,6 +30,7 @@ class SelectMixin:
                 "options": option_names,
                 "unique_id": f"{self.config['device']['name']}_{obj_id}",
                 "device": self.device_info,
+                "default_entity_id": f"select.{self.device_slug}_{obj_id}",
             }
             if s.get("icon"):
                 payload["icon"] = s["icon"]

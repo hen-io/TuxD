@@ -78,6 +78,7 @@ class SelfUpdateMixin:
             "device": self.device_info,
             "icon": "mdi:source-branch",
             "entity_category": "config",
+            "default_entity_id": f"select.{self.device_slug}_config_self_update_release_channel",
         }
         self.publish(self._discovery_topic("select", oid), json.dumps(payload), retain=True)
         self.publish(state_topic, _RELEASE_CHANNEL_LABELS[current], retain=True)

@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.12-BETA-2"
+VERSION = "1.2.13"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -282,6 +282,13 @@ def channel_sort_key(v: str):
     return base, _CHANNEL_RANK[channel], num
 
 
+def release_matches_channel(version: str, release_channel: str) -> bool:
+    parsed = parse_release_channel(version)
+    if parsed is None:
+        return False
+    return parsed[1] == str(release_channel or "stable").strip().lower()
+
+
 def _read_upgrade_info_flag(name: str) -> bool:
     try:
         path = Path(__file__).resolve().parent / "bin" / "upgrade" / "upgrade.info"
@@ -369,6 +376,8 @@ def find_newer_release_github(prefer_latest=False, release_channel="stable"):
         return None, None, None
     remote_version = m.group(1).strip()
 
+    if not release_matches_channel(remote_version, release_channel):
+        return None, None, None
     if channel_sort_key(remote_version) <= channel_sort_key(VERSION):
         return None, None, None
     if is_version_recently_failed(remote_version):
