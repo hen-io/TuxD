@@ -272,6 +272,13 @@ class HADirectBase:
         if self._loop is None or self._ws is None or self._send_lock is None:
             return
         try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+        if running_loop is self._loop:
+            self._send_nowait(obj)
+            return
+        try:
             future = asyncio.run_coroutine_threadsafe(self._locked_send(json.dumps(obj)), self._loop)
             future.result(timeout=timeout)
         except Exception:
