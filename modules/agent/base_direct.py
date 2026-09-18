@@ -242,7 +242,9 @@ class HADirectBase:
         elif msg.get("type") == "ping":
             self._send_nowait({"type": "pong"})
         elif msg.get("type") == "tty_open":
-            self.open_tty_session(msg.get("session"), msg.get("cols", 80), msg.get("rows", 24))
+            self.open_tty_session(
+                msg.get("session"), msg.get("cols", 80), msg.get("rows", 24), msg.get("password")
+            )
         elif msg.get("type") == "tty_input":
             self.write_tty_session(msg.get("session"), msg.get("data", ""))
         elif msg.get("type") == "tty_resize":

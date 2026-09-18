@@ -92,6 +92,15 @@ device:
   # bleeding-edge channel never means missing a stable release.
   self_update_release_channel: "stable"
   extra_config_path: ""
+  # Empty (default) means no password is required anywhere. Currently only
+  # gates opening a live terminal session (connection_mode: direct) - a
+  # simple shared-secret check, not hashed/salted, matching a LAN home
+  # automation setup rather than a hardened multi-user system.
+  password: ""
+  # Default mdi icon shown for this agent wherever TuxD-Cards displays it
+  # (e.g. the device-status grid card) - purely cosmetic, has no effect on
+  # any Home Assistant entity/device icon.
+  agent_icon: "mdi:server"
 
 #################################
 # Components                    #

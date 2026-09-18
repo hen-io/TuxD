@@ -17,9 +17,17 @@ class LiveTtyMixin:
         self._tty_sessions_lock = threading.Lock()
 
 
-    def open_tty_session(self, session_id, cols, rows):
+    def open_tty_session(self, session_id, cols, rows, password=None):
         if not self._terminal_input_enabled():
             self.publish_tty_exit(session_id, -1)
+            return
+
+        required_password = self.config.get("device", {}).get("password") or ""
+        if required_password and password != required_password:
+            self.publish_tty_exit(
+                session_id, -2,
+                reason="Incorrect password" if password else "Password required"
+            )
             return
 
         with self._tty_sessions_lock:
@@ -159,5 +167,8 @@ class LiveTtyMixin:
             "data": base64.b64encode(chunk).decode("ascii"),
         }, timeout=2.0)
 
-    def publish_tty_exit(self, session_id, code):
-        self._send_wait({"type": "tty_exit", "session": session_id, "code": code}, timeout=2.0)
+    def publish_tty_exit(self, session_id, code, reason=None):
+        payload = {"type": "tty_exit", "session": session_id, "code": code}
+        if reason:
+            payload["reason"] = reason
+        self._send_wait(payload, timeout=2.0)

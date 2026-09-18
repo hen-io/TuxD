@@ -95,6 +95,19 @@ class ComponentSensorsMixin:
         )
         self.publish(f"{self.base_topic}/mqtt_base_topic", self.base_topic, retain=True)
 
+        self._sensor_discovery(
+            "agent_icon",
+            "Agent icon",
+            f"{self.base_topic}/agent_icon",
+            icon="mdi:image-marker-outline",
+            entity_category="diagnostic"
+        )
+        self.publish(
+            f"{self.base_topic}/agent_icon",
+            self.config.get("device", {}).get("agent_icon") or "mdi:server",
+            retain=True
+        )
+
         if cfg.get("system_load", {}).get("enabled", True):
             self._sensor_discovery(
                 "load_avg_1m",
