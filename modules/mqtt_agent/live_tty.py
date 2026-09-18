@@ -10,32 +10,26 @@ import threading
 
 class LiveTtyMixin:
 
+    _MAX_TTY_SESSIONS = 2
+
     def init_live_tty(self):
         self._tty_sessions = {}
         self._tty_sessions_lock = threading.Lock()
 
-    def _live_tty_cfg(self):
-        val = (self.config.get("terminal") or {}).get("live_tty", {})
-        return val if isinstance(val, dict) else {}
-
-    def _live_tty_enabled(self):
-        return bool(self._live_tty_cfg().get("enabled", True))
-
 
     def open_tty_session(self, session_id, cols, rows):
-        if not self._live_tty_enabled():
+        if not self._terminal_input_enabled():
             self.publish_tty_exit(session_id, -1)
             return
 
         with self._tty_sessions_lock:
             if session_id in self._tty_sessions:
                 return
-            max_sessions = int(self._live_tty_cfg().get("max_sessions", 2))
-            if max_sessions > 0 and len(self._tty_sessions) >= max_sessions:
+            if len(self._tty_sessions) >= self._MAX_TTY_SESSIONS:
                 self.publish_tty_exit(session_id, -1)
                 return
 
-        shell = (self._live_tty_cfg().get("shell") or "").strip() or os.environ.get("SHELL") or "/bin/bash"
+        shell = os.environ.get("SHELL") or "/bin/bash"
 
         home_dir = os.path.expanduser("~")
         term_value = self._tty_pick_term()
