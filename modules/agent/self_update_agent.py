@@ -26,7 +26,7 @@ class SelfUpdateMixin:
 
         self._update_discovery(
             "self_update",
-            "TuxD update",
+            "TuxD Agent Update",
             f"{base}/state",
             command_topic=command_topic,
             icon="mdi:linux",
@@ -35,7 +35,7 @@ class SelfUpdateMixin:
 
         self._button_discovery(
             "self_update_check",
-            "Check for TuxD Updates",
+            "Check for TuxD Agent Updates",
             f"{base}/check/set",
             icon="mdi:cloud-refresh",
             entity_category="diagnostic",
@@ -47,7 +47,7 @@ class SelfUpdateMixin:
                 json.dumps({
                     "installed_version": self.version,
                     "latest_version": self.version,
-                    "title": "TuxD",
+                    "title": "TuxD Agent",
                     "in_progress": False,
                 }),
                 retain=True,
@@ -70,7 +70,7 @@ class SelfUpdateMixin:
         self._release_channel_cmd_topic = command_topic
 
         payload = {
-            "name": "TuxD Release Channel",
+            "name": "TuxD Agent Release Channel",
             "state_topic": state_topic,
             "command_topic": command_topic,
             "options": [_RELEASE_CHANNEL_LABELS[c] for c in _RELEASE_CHANNELS],
@@ -118,7 +118,7 @@ class SelfUpdateMixin:
         state = {
             "installed_version": self.version,
             "latest_version": new_version if new_version else self.version,
-            "title": "TuxD",
+            "title": "TuxD Agent",
         }
         if new_version and src_type:
             summary = (release_notes or {}).get("summary") or ""
@@ -165,7 +165,7 @@ class SelfUpdateMixin:
             if not new_version or not src_type or not src_val:
                 return
             self._set_self_update_progress(True)
-            self.set_error(True, "TuxD update installing, restarting")
+            self.set_error(True, "TuxD Agent update installing, restarting")
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"Installing TuxD {new_version}...")
             self._update_applier(new_version, src_type, src_val)
@@ -189,7 +189,7 @@ class SelfUpdateMixin:
     def _run_self_update_install_from_url(self, url):
         try:
             self._set_self_update_progress(True)
-            self.set_error(True, "TuxD update installing (offline tarball), restarting")
+            self.set_error(True, "TuxD Agent update installing (offline tarball), restarting")
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"Installing TuxD from {url}...")
             self._update_applier("offline-tarball", "url", url)
