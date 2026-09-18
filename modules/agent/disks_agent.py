@@ -78,7 +78,8 @@ class DisksMixin:
             f"{self.base_topic}/storage_used_gb",
             unit="GB",
             icon="mdi:harddisk",
-            state_class="measurement"
+            state_class="measurement",
+            ha_object_id=f"{self.device_slug}_storage_used_gb",
         )
         self._sensor_discovery(
             "storage_free_gb",
@@ -86,7 +87,8 @@ class DisksMixin:
             f"{self.base_topic}/storage_free_gb",
             unit="GB",
             icon="mdi:harddisk",
-            state_class="measurement"
+            state_class="measurement",
+            ha_object_id=f"{self.device_slug}_storage_free_gb",
         )
         self._sensor_discovery(
             "storage_used_pct",
