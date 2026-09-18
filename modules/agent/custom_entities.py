@@ -1,7 +1,7 @@
 import time
 import datetime
 import threading
-from .base import run_cmd
+from .shared import run_cmd
 
 
 class CustomEntitiesMixin:

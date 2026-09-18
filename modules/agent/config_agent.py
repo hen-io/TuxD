@@ -7,7 +7,7 @@ import threading
 import time
 import datetime
 
-from .base import slugify as _slug
+from .shared import slugify as _slug
 
 
 _FLOAT_OPTS = {"min": 0.1, "max": 86400.0, "step": 0.1}

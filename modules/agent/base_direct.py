@@ -6,7 +6,7 @@ import sys
 import threading
 import time
 
-from .base import slugify
+from .shared import slugify
 
 try:
     import websockets

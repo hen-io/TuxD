@@ -3,7 +3,7 @@ import os
 import threading
 import time
 
-from .base import run_cmd, slugify as _slug
+from .shared import run_cmd, slugify as _slug
 from modules.docker_monitor import (
     compose_containers,
     inspect_containers,

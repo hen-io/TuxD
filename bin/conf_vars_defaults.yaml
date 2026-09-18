@@ -78,6 +78,13 @@ device:
   # instead of one per field changed.
   config_restart_delay: 30
   self_update_check_interval: 300
+  # Whether the agent may EVER install an update entirely on its own
+  # (unattended, e.g. right after boot with nobody watching) - off by
+  # default, so a newer version just shows as "Update available" until a
+  # human presses Install. Separate from self_update_allow_install below,
+  # which controls whether that Install button/command exists at all -
+  # this one is purely about automatic, unattended installs.
+  auto_update: false
   self_update_allow_install: true
   # stable | rc | beta - which release tags count as an available TuxD
   # update. Each channel also sees everything more mature than it (rc sees

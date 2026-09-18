@@ -4,7 +4,7 @@ import sys
 import threading
 import time
 
-from .base import run_cmd
+from .shared import run_cmd
 from modules.host_update import update_count, update_list, default_install_cmd, parse_leading_int
 
 

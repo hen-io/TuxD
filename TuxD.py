@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.2.21"
+VERSION = "1.3.0"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -990,7 +990,7 @@ def _publish_emergency_error(cfg, reason):
 
 
 def _cleanup_stale_mqtt_discovery(cfg, timeout=5):
-    from modules.mqtt_agent.base import HAMQTTBase
+    from modules.agent.base_mqtt import HAMQTTBase
 
     mqtt_cfg = (cfg or {}).get("mqtt") or {}
     broker = (mqtt_cfg.get("broker") or "").strip()
@@ -1306,11 +1306,11 @@ def main():
                     _write_update_status("Update available")
                     status.write(c("Update skipped.", YELLOW))
                     time.sleep(1)
-            elif bool(device_cfg.get("self_update_allow_install", True)):
+            elif bool(device_cfg.get("auto_update", False)):
                 safe_apply_update_any(new_version, src_type, src_val, enabled=False)
             else:
                 _write_update_status("Update available")
-                log_write(f"Update {new_version} available but self_update_allow_install is false - not installing.")
+                log_write(f"Update {new_version} available but auto_update is false - not installing automatically.")
         elif checked_now:
             _write_update_status("Up to date")
             if enabled:
@@ -1350,7 +1350,7 @@ def main():
             _cleanup_stale_mqtt_discovery(cfg)
 
         try:
-            from modules.mqtt_agent import build_agent
+            from modules.agent import build_agent
         except Exception as e:
             if enabled:
                 status.write(c(f"Import error: {e}", RED, BOLD))

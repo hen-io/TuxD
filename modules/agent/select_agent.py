@@ -1,7 +1,7 @@
 import json
 import datetime
 import threading
-from .base import entity_object_id, run_cmd
+from .shared import entity_object_id, run_cmd
 
 
 class SelectMixin:

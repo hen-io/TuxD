@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from .base import run_cmd
+from .shared import run_cmd
 
 _BIN = Path(__file__).resolve().parent.parent.parent / "bin"
 

@@ -3,7 +3,8 @@ import time
 import threading
 import datetime
 
-from .base import HAMQTTBase, entity_object_id
+from .base_mqtt import HAMQTTBase
+from .shared import entity_object_id
 from .base_direct import HADirectBase
 from .terminal import TerminalMixin
 from .live_tty import LiveTtyMixin
