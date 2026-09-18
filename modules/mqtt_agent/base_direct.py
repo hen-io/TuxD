@@ -79,6 +79,7 @@ class HADirectBase:
 
         self._loop = None
         self._ws = None
+        self._send_lock = None
         self._thread = None
         self._connected_event = threading.Event()
         self._auth_error = None
@@ -139,6 +140,7 @@ class HADirectBase:
 
     async def _run(self):
         self._loop = asyncio.get_running_loop()
+        self._send_lock = asyncio.Lock()
         ws_url = _to_ws_url(self._ha_url) + "/api/tuxd/ws"
         ssl_ctx = None
         if ws_url.startswith("wss://"):
@@ -254,19 +256,23 @@ class HADirectBase:
                 continue
             self._send_nowait({"type": "state", "key": topic, "value": payload, "retain": True})
 
+    async def _locked_send(self, payload):
+        async with self._send_lock:
+            await self._ws.send(payload)
+
     def _send_nowait(self, obj):
-        if self._loop is None or self._ws is None:
+        if self._loop is None or self._ws is None or self._send_lock is None:
             return
         try:
-            asyncio.run_coroutine_threadsafe(self._ws.send(json.dumps(obj)), self._loop)
+            asyncio.run_coroutine_threadsafe(self._locked_send(json.dumps(obj)), self._loop)
         except Exception:
             pass
 
     def _send_wait(self, obj, timeout):
-        if self._loop is None or self._ws is None:
+        if self._loop is None or self._ws is None or self._send_lock is None:
             return
         try:
-            future = asyncio.run_coroutine_threadsafe(self._ws.send(json.dumps(obj)), self._loop)
+            future = asyncio.run_coroutine_threadsafe(self._locked_send(json.dumps(obj)), self._loop)
             future.result(timeout=timeout)
         except Exception:
             pass
