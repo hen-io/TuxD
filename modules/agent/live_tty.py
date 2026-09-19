@@ -2,6 +2,7 @@ import base64
 import fcntl
 import os
 import pty
+import secrets
 import signal
 import struct
 import termios
@@ -23,7 +24,7 @@ class LiveTtyMixin:
             return
 
         required_password = self.config.get("device", {}).get("password") or ""
-        if required_password and password != required_password:
+        if required_password and not secrets.compare_digest(str(password or ""), required_password):
             self.publish_tty_exit(
                 session_id, -2,
                 reason="Incorrect password" if password else "Password required"
