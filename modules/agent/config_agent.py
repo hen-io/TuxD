@@ -379,18 +379,34 @@ class ConfigAgentMixin:
         self._cfgnum_restart()
 
     def config_file_watch_loop(self):
-        try:
-            last_mtime = os.path.getmtime(_CONFIG_FILE)
-        except OSError as e:
-            print(f"TuxD: config_file_watch_loop could not read {_CONFIG_FILE}: {e!r}")
-            last_mtime = None
-        while not self._stop_event.wait(timeout=5.0):
+        extra_config_path = self.config.get("device", {}).get("extra_config_path", "")
+
+        def _mtime(path):
             try:
-                mtime = os.path.getmtime(_CONFIG_FILE)
+                return os.path.getmtime(path)
             except OSError:
-                continue
-            if last_mtime is not None and mtime != last_mtime:
-                msg = f"TuxD: detected external change to {_CONFIG_FILE} - restarting now"
+                return None
+
+        last_mtime = _mtime(_CONFIG_FILE)
+        if last_mtime is None:
+            print(f"TuxD: config_file_watch_loop could not read {_CONFIG_FILE}")
+        last_extra_mtime = _mtime(extra_config_path) if extra_config_path else None
+
+        while not self._stop_event.wait(timeout=5.0):
+            mtime = _mtime(_CONFIG_FILE)
+            extra_mtime = _mtime(extra_config_path) if extra_config_path else None
+
+            changed_path = None
+            if mtime is not None and last_mtime is not None and mtime != last_mtime:
+                changed_path = _CONFIG_FILE
+            elif (
+                extra_config_path and extra_mtime is not None
+                and last_extra_mtime is not None and extra_mtime != last_extra_mtime
+            ):
+                changed_path = extra_config_path
+
+            if changed_path:
+                msg = f"TuxD: detected external change to {changed_path} - restarting now"
                 print(msg)
                 try:
                     if self._terminal_output_enabled():
@@ -401,7 +417,9 @@ class ConfigAgentMixin:
                     self._cfgnum_restart_instant()
                 except Exception as e:
                     print(f"TuxD: restart after config change FAILED: {e!r}")
+
             last_mtime = mtime
+            last_extra_mtime = extra_mtime
 
     def init_config_texts(self):
         self._config_texts = {}
