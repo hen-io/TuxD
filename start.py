@@ -182,7 +182,16 @@ def full_repair(version=None, force=False):
                     try:
                         t.extractall(extract_dir, filter="data")
                     except TypeError:
-                        t.extractall(extract_dir)
+                        dest_real = os.path.realpath(extract_dir)
+                        safe_members = []
+                        for member in t.getmembers():
+                            if member.issym() or member.islnk():
+                                continue
+                            target = os.path.realpath(os.path.join(dest_real, member.name))
+                            if target != dest_real and not target.startswith(dest_real + os.sep):
+                                raise RuntimeError(f"Unsafe path in update archive: {member.name}")
+                            safe_members.append(member)
+                        t.extractall(extract_dir, members=safe_members)
 
             release_root = extract_dir
             if not (release_root / "modules").exists():

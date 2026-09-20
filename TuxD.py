@@ -18,7 +18,7 @@ import ast
 import datetime
 import re
 
-VERSION = "1.4.2"
+VERSION = "1.4.3"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -493,7 +493,16 @@ def _extract_tar(tar_path: Path, dest_dir: Path):
         try:
             t.extractall(dest_dir, filter="data")
         except TypeError:
-            t.extractall(dest_dir)
+            dest_real = os.path.realpath(dest_dir)
+            safe_members = []
+            for member in t.getmembers():
+                if member.issym() or member.islnk():
+                    continue
+                target = os.path.realpath(os.path.join(dest_real, member.name))
+                if target != dest_real and not target.startswith(dest_real + os.sep):
+                    raise RuntimeError(f"Unsafe path in update archive: {member.name}")
+                safe_members.append(member)
+            t.extractall(dest_dir, members=safe_members)
 
 
 def _find_release_root(extracted_dir: Path):

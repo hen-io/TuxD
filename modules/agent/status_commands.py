@@ -1,6 +1,6 @@
 import json
 import time
-from .shared import run_cmd, slugify as _slug
+from .shared import run_cmd
 
 _DEFAULT_SUFFIXES = {
     "updates_available": " new updates",
