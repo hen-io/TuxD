@@ -35,13 +35,7 @@ class HostUpdateMixin:
             attributes_topic=f"{base}/state_attributes",
         )
 
-        self._sensor_discovery(
-            "host_update_available",
-            cfg.get("count_sensor_name", "Available updates"),
-            f"{base}/available",
-            icon="mdi:package-up",
-            entity_category="diagnostic",
-        )
+        self.publish(self._discovery_topic("sensor", "host_update_available"), "", retain=True)
 
         self._sensor_discovery(
             "host_new_package_version_available",
@@ -99,10 +93,9 @@ class HostUpdateMixin:
         cfg = self.config.get("host_update", {}) or {}
         base = f"{self.base_topic}/host_update"
 
-        source = (cfg.get("count_source") or "").strip()
-        if source:
-            os_count = parse_leading_int(self.get_state(f"{self.base_topic}/{source}"))
-        else:
+        source = (cfg.get("count_source") or "updates_available").strip()
+        os_count = parse_leading_int(self.get_state(f"{self.base_topic}/{source}")) if source else None
+        if os_count is None:
             os_count = update_count(cfg.get("check_cmd") or None)
 
         docker_count = self._docker_update_count(cfg)
@@ -128,7 +121,6 @@ class HostUpdateMixin:
 
         self._host_update_last_state = dict(state)
         self.publish(f"{base}/state", json.dumps(state), retain=True)
-        self.publish(f"{base}/available", f"{count} updates available")
         self.publish(f"{base}/package_versions", self._packages_value(pkgs))
 
         attrs = {"kernel_version": self._kernel_version()}

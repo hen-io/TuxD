@@ -227,10 +227,10 @@ docker:
 host_update:
   enabled: true
   name: "Host updates"
-  count_sensor_name: "Available updates"
   packages_sensor_name: "New package version available"
   update_interval: 3600
-  count_source: ""
+  # Which commands.status entry (below) to read the update count from
+  count_source: "updates_available"
   include_docker_updates: true
   check_cmd: ""
   list_cmd: ""
@@ -240,12 +240,14 @@ host_update:
   allow_install: true
   device_class: ""
 
-# Example:
+# Example, pairing count_source (above) with a commands.status entry tuned
+# for a system where the auto-detected check_cmd/list_cmd don't work as-is:
+# commands:
+#   status:
+#     updates_available:
+#       enabled: true
+#       cmd: "sudo apt list --upgradable 2>/dev/null | grep -c upgradable"
 # host_update:
-#   enabled: true
-#   allow_install: true
-#   count_source: "updates_available"
-#   install_button_name: "Update and reboot"
 #   list_cmd: "apt-get -s upgrade | awk '/^Inst /{print $2}'"
 #   install_cmd: "sudo apt-get update && sudo apt-get -y upgrade"
 
