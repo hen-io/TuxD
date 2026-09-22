@@ -18,15 +18,15 @@ import ast
 import datetime
 import re
 
-VERSION = "1.4.5"
+VERSION = "1.4.6"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
 
 UPDATE_STATUS_FILE = "update_status.log"
 
-GITHUB_TIMEOUT = 8
-DOWNLOAD_TIMEOUT = 60
+GITHUB_TIMEOUT = 1
+DOWNLOAD_TIMEOUT = 5
 
 GITHUB_REPO = "hen-io/TuxD"
 
