@@ -26,7 +26,7 @@ def _pkg_manager():
 
 
 _CHECK_CMDS = {
-    "apt-get": "apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | grep -c '^Inst '",
+    "apt-get": "apt list --upgradable 2>/dev/null | grep -c upgradable",
     "dnf": "dnf -q check-update 2>/dev/null | grep -cE '^[A-Za-z0-9._+-]+\\.[A-Za-z0-9_]+ '",
     "yum": "yum -q check-update 2>/dev/null | grep -cE '^[A-Za-z0-9._+-]+\\.[A-Za-z0-9_]+ '",
     "zypper": "zypper -q -t list-updates 2>/dev/null | grep -c '^v |'",
@@ -34,8 +34,7 @@ _CHECK_CMDS = {
 }
 
 _LIST_CMDS = {
-    "apt-get": "apt-get -s -o Debug::NoLocking=true upgrade 2>/dev/null | "
-               "awk '/^Inst /{c=$3;n=$4;gsub(/[][]/,\"\",c);gsub(/[()]/,\"\",n);print $2 \"-\" c \">\" n}'",
+    "apt-get": "apt list --upgradable 2>/dev/null | grep upgradable",
     "dnf": "dnf -q check-update 2>/dev/null | awk '/^[A-Za-z0-9._+-]+\\.[A-Za-z0-9_]+ /{print $1 \">\" $2}'",
     "yum": "yum -q check-update 2>/dev/null | awk '/^[A-Za-z0-9._+-]+\\.[A-Za-z0-9_]+ /{print $1 \">\" $2}'",
     "zypper": "zypper -q -t list-updates 2>/dev/null | awk -F'|' '/^v \\|/{gsub(/ /,\"\",$3); gsub(/ /,\"\",$5); print $3 \">\" $5}'",
