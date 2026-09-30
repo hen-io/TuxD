@@ -10,7 +10,7 @@ def slugify(s):
 _ENTITY_COMPONENT_PREFIXES = (
     "builtin_", "custom_button_", "custom_sensor_", "disk_", "docker_",
     "lag_monitor_", "log_sensor_", "net_", "select_",
-    "self_update_", "status_", "system_",
+    "self_update_", "status_", "system_", "tugboat_",
 )
 
 
