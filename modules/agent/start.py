@@ -15,6 +15,7 @@ from .log_sensor_agent import LogSensorMixin
 from .network_agent import NetworkMixin
 from .disks_agent import DisksMixin
 from .docker_agent import DockerMixin
+from .tugboat_agent import TugboatMixin
 from .host_update_agent import HostUpdateMixin
 from .lm_sensors_agent import LMSensorsMixin
 from .tasks_agent import TasksMixin
@@ -38,6 +39,7 @@ class TuxDAgentMixin(
     NetworkMixin,
     DisksMixin,
     DockerMixin,
+    TugboatMixin,
     HostUpdateMixin,
     LMSensorsMixin,
     LagMonitorMixin,
@@ -66,6 +68,7 @@ class TuxDAgentMixin(
         self.init_network()
         self.init_disks()
         self.init_docker()
+        self.init_tugboat()
         self.init_host_update()
         self.init_self_update()
         self.init_lag_monitor()
@@ -213,6 +216,7 @@ class TuxDAgentMixin(
             self.register_network,
             self.register_disks,
             self.register_docker,
+            self.register_tugboat,
             self.register_host_update,
             self.register_self_update,
             self.register_release_channel_select,
@@ -289,6 +293,14 @@ class TuxDAgentMixin(
 
         if topic.startswith(f"{self.base_topic}/docker/update/") and topic.endswith("/set"):
             self.handle_docker_update_install(topic)
+            return
+
+        if topic == f"{self.base_topic}/tugboat/select_stack/set":
+            self.handle_tugboat_stack_select(payload)
+            return
+
+        if topic == f"{self.base_topic}/tugboat/select_action/set":
+            self.handle_tugboat_action_select(payload)
             return
 
         if topic == f"{self.base_topic}/host_update/set":
@@ -390,6 +402,9 @@ class TuxDAgentMixin(
 
         if self.config.get("docker", {}).get("enabled", False):
             threading.Thread(target=self.docker_loop, daemon=True).start()
+
+        if self.config.get("tugboat", {}).get("enabled", False):
+            threading.Thread(target=self.tugboat_loop, daemon=True).start()
 
         if self.config.get("host_update", {}).get("enabled", False):
             threading.Thread(target=self.host_update_loop, daemon=True).start()
