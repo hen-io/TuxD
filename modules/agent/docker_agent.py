@@ -59,6 +59,7 @@ class DockerMixin:
             f"{self.base_topic}/docker/enabled",
             icon="mdi:docker",
             entity_category="diagnostic",
+            ha_object_id=f"{self.device_slug}_docker_enabled",
         )
         self.publish(f"{self.base_topic}/docker/enabled", "ON" if active else "OFF")
 

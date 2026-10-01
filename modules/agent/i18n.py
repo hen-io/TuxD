@@ -3,6 +3,7 @@ LANGUAGES = ("en", "nb")
 _NB = {
     "Select stack...": "Velg stack...",
     "Select action...": "Velg handling...",
+    "All stacks": "Alle stacks",
     "Update": "Oppdater",
     "Start": "Start",
     "Stop": "Stopp",

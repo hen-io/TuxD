@@ -17,6 +17,7 @@ class TugboatMixin:
         self._tugboat_known_stacks = []
         self._tugboat_stack_placeholder = self.tr("Select stack...")
         self._tugboat_action_placeholder = self.tr("Select action...")
+        self._tugboat_all_stacks = self.tr("All stacks")
         self._tugboat_actions = {self.tr(label): flag for label, flag in ACTIONS.items()}
         self._tugboat_selected_stack = self._tugboat_stack_placeholder
         self._tugboat_selected_action = self._tugboat_action_placeholder
@@ -36,6 +37,7 @@ class TugboatMixin:
             f"{self.base_topic}/tugboat/enabled",
             icon="mdi:ferry",
             entity_category="diagnostic",
+            ha_object_id=f"{self.device_slug}_tugboat_enabled",
         )
         self.publish(f"{self.base_topic}/tugboat/enabled", "ON" if active else "OFF")
 
@@ -61,8 +63,14 @@ class TugboatMixin:
             entity_category="diagnostic",
         )
 
+    def _tugboat_stack_options(self):
+        options = [self._tugboat_stack_placeholder]
+        if len(self._tugboat_known_stacks) > 1:
+            options.append(self._tugboat_all_stacks)
+        return options + self._tugboat_known_stacks
+
     def _register_tugboat_selects(self):
-        stack_options = [self._tugboat_stack_placeholder] + self._tugboat_known_stacks
+        stack_options = self._tugboat_stack_options()
         if self._tugboat_selected_stack not in stack_options:
             self._tugboat_selected_stack = self._tugboat_stack_placeholder
         stack_state_topic = f"{self.base_topic}/tugboat/select_stack"
@@ -70,6 +78,7 @@ class TugboatMixin:
             "name": self.tr("TugBoat Stack"),
             "state_topic": stack_state_topic,
             "command_topic": f"{stack_state_topic}/set",
+            "json_attributes_topic": f"{stack_state_topic}/attributes",
             "options": stack_options,
             "unique_id": f"{self.config['device']['name']}_tugboat_select_stack",
             "device": self.device_info,
@@ -78,6 +87,7 @@ class TugboatMixin:
             "default_entity_id": f"select.{self.device_slug}_tugboat_stack",
         }), retain=True)
         self.publish(stack_state_topic, self._tugboat_selected_stack, retain=True)
+        self.publish(f"{stack_state_topic}/attributes", json.dumps({"stacks": self._tugboat_known_stacks}), retain=True)
 
         action_options = [self._tugboat_action_placeholder] + list(self._tugboat_actions)
         action_state_topic = f"{self.base_topic}/tugboat/select_action"
@@ -140,7 +150,7 @@ class TugboatMixin:
 
     def handle_tugboat_stack_select(self, payload):
         value = payload.strip()
-        if value not in ([self._tugboat_stack_placeholder] + self._tugboat_known_stacks):
+        if value not in self._tugboat_stack_options():
             return
         self._tugboat_selected_stack = value
         self.publish(f"{self.base_topic}/tugboat/select_stack", value, retain=True)
@@ -168,11 +178,15 @@ class TugboatMixin:
 
     def _run_tugboat_action(self, stack, action):
         flag = self._tugboat_actions.get(action)
+        targets = list(self._tugboat_known_stacks) if stack == self._tugboat_all_stacks else [stack]
         try:
-            with self.busy(f"tugboat: {action} {stack}"):
-                output = run_command(self._tugboat_python_bin, self._tugboat_path, flag, stack)
-                if flag != "--healthcheck":
-                    run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", stack)
+            outputs = []
+            for target in targets:
+                with self.busy(f"tugboat: {action} {target}"):
+                    outputs.append(run_command(self._tugboat_python_bin, self._tugboat_path, flag, target))
+                    if flag != "--healthcheck":
+                        run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", target)
+            output = "\n".join(o for o in outputs if o)
 
             if output and self._terminal_output_enabled():
                 for line in output.splitlines():

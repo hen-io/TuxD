@@ -112,7 +112,7 @@ class TuxDAgentMixin(
             retain=True
         )
 
-    def _binary_sensor_discovery(self, object_id, name, state_topic, device_class=None, icon=None, attributes_topic=None, entity_category=None):
+    def _binary_sensor_discovery(self, object_id, name, state_topic, device_class=None, icon=None, attributes_topic=None, entity_category=None, ha_object_id=None):
         payload = {
             "name": self.tr(name),
             "state_topic": state_topic,
@@ -121,7 +121,8 @@ class TuxDAgentMixin(
             "payload_on": "ON",
             "payload_off": "OFF",
         }
-        payload["default_entity_id"] = f"binary_sensor.{self.device_slug}_{entity_object_id(object_id)}"
+        entity_id = ha_object_id or f"{self.device_slug}_{entity_object_id(object_id)}"
+        payload["default_entity_id"] = f"binary_sensor.{entity_id}"
         if device_class:
             payload["device_class"] = device_class
         if icon:
