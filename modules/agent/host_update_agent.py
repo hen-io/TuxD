@@ -116,8 +116,12 @@ class HostUpdateMixin:
 
         pkgs = update_list(cfg.get("list_cmd") or None) if os_count > 0 else []
 
-        if pkgs:
-            state["release_summary"] = "\n".join(f"- {p}" for p in pkgs)
+        if count > 0:
+            parts = []
+            if pkgs:
+                parts.append("\n".join(f"- {p}" for p in pkgs))
+            parts.append(self._host_update_install_note(cfg))
+            state["release_summary"] = "\n\n".join(parts)
 
         self._host_update_last_state = dict(state)
         self.publish(f"{base}/state", json.dumps(state), retain=True)
@@ -173,6 +177,23 @@ class HostUpdateMixin:
                     return cmd
         return None
 
+    def _host_update_install_plan(self, cfg):
+        if cfg.get("use_custom_install_cmd", False):
+            if cfg.get("install_cmd"):
+                return cfg.get("install_cmd"), self.tr("custom install_cmd")
+        else:
+            cmd = self._host_update_button_cmd(cfg)
+            if cmd:
+                name = str(cfg.get("install_button_name") or "Update and reboot").strip()
+                return cmd, f'{self.tr("button")} "{name}"'
+        return default_install_cmd(), self.tr("default for this system")
+
+    def _host_update_install_note(self, cfg):
+        if not cfg.get("allow_install", False):
+            return self.tr("Installing from Home Assistant is disabled (host_update.allow_install: false).")
+        cmd, source = self._host_update_install_plan(cfg)
+        return f'{self.tr("Install runs")} ({source}): {cmd}'
+
     def handle_host_update_install(self):
         cfg = self.config.get("host_update", {}) or {}
         if not cfg.get("enabled", False) or not cfg.get("allow_install", False):
@@ -180,10 +201,7 @@ class HostUpdateMixin:
         if self._host_update_installing:
             return
 
-        if cfg.get("use_custom_install_cmd", False):
-            cmd = cfg.get("install_cmd") or default_install_cmd()
-        else:
-            cmd = self._host_update_button_cmd(cfg) or default_install_cmd()
+        cmd, _source = self._host_update_install_plan(cfg)
 
         if not cmd:
             return
@@ -207,6 +225,18 @@ class HostUpdateMixin:
         except Exception:
             pass
 
+        self._host_update_installing = False
+
+        try:
+            cfg = self.config.get("host_update", {}) or {}
+            source = (cfg.get("count_source") or "updates_available").strip()
+            if source:
+                self.refresh_status_command(source)
+            if not self._publish_host_update_state():
+                self._set_host_update_progress(False)
+        except Exception:
+            self._set_host_update_progress(False)
+
         try:
             if self._terminal_output_enabled():
                 self.publish(
@@ -217,6 +247,4 @@ class HostUpdateMixin:
         except Exception:
             pass
 
-        self._host_update_installing = False
-        self._set_host_update_progress(False)
         self._hard_restart()

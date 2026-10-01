@@ -37,6 +37,12 @@ _NB = {
     "Docker containers with errors": "Docker-containere med feil",
     "Host updates": "Systemoppdateringer",
     "New package version available": "Ny pakkeversjon tilgjengelig",
+    "Install runs": "Installasjon kjører",
+    "button": "knapp",
+    "custom install_cmd": "egendefinert install_cmd",
+    "default for this system": "standard for dette systemet",
+    "Installing from Home Assistant is disabled (host_update.allow_install: false).":
+        "Installasjon fra Home Assistant er slått av (host_update.allow_install: false).",
     "TuxD Agent Update": "TuxD-agentoppdatering",
     "Check for TuxD Agent Updates": "Se etter TuxD-agentoppdateringer",
     "TuxD Agent Release Channel": "TuxD-agent utgivelseskanal",

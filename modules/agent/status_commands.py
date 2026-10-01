@@ -59,20 +59,31 @@ class StatusCommandsMixin:
                 if not cmd:
                     continue
 
-                expanded = cmd
-                for var, val in self._status_env.items():
-                    expanded = expanded.replace(f"${var}", val)
-
-                output = run_cmd(expanded)
-
-                lines = output.split("\n")
-                value = lines[0] if lines else ""
-                attrs = {"lines": lines[1:]} if len(lines) > 1 else {}
-
-                self._status_env[key] = value
-
-                suffix = cfg.get("suffix") or _DEFAULT_SUFFIXES.get(key, "")
-                self.publish(f"{self.base_topic}/{key}", value + suffix if value else value)
-                self.publish(f"{self.base_topic}/{key}_attributes", json.dumps(attrs))
+                self._run_status_command(key, cfg)
 
             self._stop_event.wait(timeout=1)
+
+    def _run_status_command(self, key, cfg):
+        expanded = cfg.get("cmd", "")
+        for var, val in self._status_env.items():
+            expanded = expanded.replace(f"${var}", val)
+
+        output = run_cmd(expanded)
+
+        lines = output.split("\n")
+        value = lines[0] if lines else ""
+        attrs = {"lines": lines[1:]} if len(lines) > 1 else {}
+
+        self._status_env[key] = value
+
+        suffix = cfg.get("suffix") or _DEFAULT_SUFFIXES.get(key, "")
+        self.publish(f"{self.base_topic}/{key}", value + suffix if value else value)
+        self.publish(f"{self.base_topic}/{key}_attributes", json.dumps(attrs))
+
+    def refresh_status_command(self, key):
+        cfg = self.commands_status.get(key)
+        if not isinstance(cfg, dict) or not cfg.get("enabled", False) or not cfg.get("cmd"):
+            return False
+        self._status_last_run[key] = time.time()
+        self._run_status_command(key, cfg)
+        return True
