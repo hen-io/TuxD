@@ -22,6 +22,7 @@ class TugboatMixin:
         self._tugboat_selected_stack = self._tugboat_stack_placeholder
         self._tugboat_selected_action = self._tugboat_action_placeholder
         self._tugboat_running = False
+        self._tugboat_images = {}
 
     def _tugboat_active(self):
         if not self._tugboat_enabled or not self._tugboat_path:
@@ -49,6 +50,7 @@ class TugboatMixin:
         for name in self._tugboat_known_stacks:
             self._register_tugboat_stack(name)
         self._register_tugboat_selects()
+        self._tugboat_images = {}
         if status:
             self._publish_tugboat_status(status)
 
@@ -146,7 +148,91 @@ class TugboatMixin:
                 "last_action": info.get("last_action", {}),
                 "last_update": info.get("last_update", ""),
                 "last_backup": info.get("last_backup", ""),
+                "updates_available": info.get("updates_available", 0),
+                "images_checked_at": info.get("images_checked_at", ""),
             }))
+
+        self._publish_tugboat_images(stacks)
+
+    def _publish_tugboat_images(self, stacks):
+        seen = {}
+        for name, info in stacks.items():
+            if not isinstance(info, dict):
+                continue
+            stack_slug = _slug(name)
+            for img in info.get("images") or []:
+                if not isinstance(img, dict) or not img.get("image"):
+                    continue
+                ref = str(img["image"]).split("@", 1)[0]
+                image_slug = _slug(ref)
+                oid = f"tugboat_image_{stack_slug}_{image_slug}"
+                topic = f"{self.base_topic}/tugboat/image/{stack_slug}/{image_slug}"
+                if oid not in self._tugboat_images:
+                    self._update_discovery(
+                        oid,
+                        f"{name}: {ref}",
+                        f"{topic}/state",
+                        command_topic=f"{topic}/set",
+                        icon="mdi:ferry",
+                        entity_category="diagnostic",
+                        ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}_{image_slug}",
+                    )
+                state = self._tugboat_image_state(ref, img)
+                seen[oid] = (name, f"{topic}/state", state)
+                self.publish(f"{topic}/state", json.dumps(state))
+
+        for oid in set(self._tugboat_images) - set(seen):
+            self.publish(self._discovery_topic("update", oid), "", retain=True)
+        self._tugboat_images = seen
+
+    @staticmethod
+    def _tugboat_image_state(ref, img):
+        def short(digest):
+            return str(digest or "").split(":")[-1][:12]
+
+        status = str(img.get("status") or "unknown")
+        local = short(img.get("local_digest"))
+        remote = short(img.get("remote_digest"))
+        detail = str(img.get("detail") or "")
+        outdated = status in ("update_available", "not_pulled")
+
+        installed = local or status
+        state = {
+            "installed_version": installed,
+            "latest_version": installed,
+            "title": ref,
+            "in_progress": False,
+        }
+        if outdated:
+            state["latest_version"] = remote if remote and remote != installed else "update"
+            lines = [detail or "Newer image available in registry."]
+            if img.get("local_digest"):
+                lines.append(f"Local: {img.get('local_digest')}")
+            if img.get("remote_digest"):
+                lines.append(f"Registry: {img.get('remote_digest')}")
+            state["release_summary"] = "\n".join(lines)
+        elif detail:
+            state["release_summary"] = detail
+        return state
+
+    def handle_tugboat_image_install(self, topic):
+        try:
+            stack_slug = topic.split("/tugboat/image/", 1)[1].split("/", 1)[0]
+        except Exception:
+            return
+        stack = next((n for n in self._tugboat_known_stacks if _slug(n) == stack_slug), None)
+        action = next((label for label, flag in self._tugboat_actions.items() if flag == "--update"), None)
+        if not stack or not action or self._tugboat_running:
+            return
+        self._tugboat_running = True
+        for name, state_topic, state in list(self._tugboat_images.values()):
+            if name == stack:
+                self.publish(state_topic, json.dumps(dict(state, in_progress=True)))
+        threading.Thread(
+            target=self._run_tugboat_action,
+            args=(stack, action, False),
+            daemon=True,
+        ).start()
 
     def handle_tugboat_stack_select(self, payload):
         value = payload.strip()
@@ -176,7 +262,7 @@ class TugboatMixin:
             daemon=True,
         ).start()
 
-    def _run_tugboat_action(self, stack, action):
+    def _run_tugboat_action(self, stack, action, reset_selects=True):
         flag = self._tugboat_actions.get(action)
         targets = list(self._tugboat_known_stacks) if stack == self._tugboat_all_stacks else [stack]
         try:
@@ -196,11 +282,15 @@ class TugboatMixin:
             status = read_status(self._tugboat_path)
             if status:
                 self._publish_tugboat_status(status)
+            else:
+                for _name, state_topic, state in list(self._tugboat_images.values()):
+                    self.publish(state_topic, json.dumps(state))
         finally:
-            self._tugboat_selected_stack = self._tugboat_stack_placeholder
-            self._tugboat_selected_action = self._tugboat_action_placeholder
-            self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_stack_placeholder, retain=True)
-            self.publish(f"{self.base_topic}/tugboat/select_action", self._tugboat_action_placeholder, retain=True)
+            if reset_selects:
+                self._tugboat_selected_stack = self._tugboat_stack_placeholder
+                self._tugboat_selected_action = self._tugboat_action_placeholder
+                self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_stack_placeholder, retain=True)
+                self.publish(f"{self.base_topic}/tugboat/select_action", self._tugboat_action_placeholder, retain=True)
             self._tugboat_running = False
 
     def tugboat_loop(self):

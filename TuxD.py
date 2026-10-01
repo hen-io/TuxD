@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.5.6"
+VERSION = "1.5.7"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -58,6 +58,7 @@ _LOG_ROTATE_THREAD = None
 _CLEANUP_DONE = False
 _STATUS = None
 _AGENT = None
+_SHUTDOWN_REQUESTED = False
 
 
 def _log_rotate_loop():
@@ -91,7 +92,7 @@ def log_write(text: str):
 CRASH_REPORT_DIR = "logs"
 _CRASH_REPORT_MAX_PER_RUN = 10
 _RECENT_OUTPUT = collections.deque(maxlen=500)
-_RECENT_OUTPUT_LOCK = threading.Lock()
+_RECENT_OUTPUT_LOCK = threading.RLock()
 _RECENT_PARTIAL = {"text": ""}
 _ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
 _CRASH_REPORTS_WRITTEN = 0
@@ -1256,6 +1257,8 @@ def _cleanup_terminal():
 
 
 def _signal_handler(signum, frame):
+    global _SHUTDOWN_REQUESTED
+    _SHUTDOWN_REQUESTED = True
     _cleanup_terminal()
     raise SystemExit(0)
 
@@ -1508,7 +1511,7 @@ def main():
 
             first_start = False
 
-            if not broker_lost:
+            if not broker_lost or _SHUTDOWN_REQUESTED:
                 break
 
             if enabled:
