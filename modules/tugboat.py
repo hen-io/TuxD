@@ -38,8 +38,9 @@ def read_status(path, conf=None):
             data = json.load(f)
     except Exception:
         return None
-    stacks = data.get("stacks")
-    return data if isinstance(stacks, dict) else None
+    if not isinstance(data, dict) or not isinstance(data.get("stacks"), dict):
+        return None
+    return data
 
 
 def stack_names(status):

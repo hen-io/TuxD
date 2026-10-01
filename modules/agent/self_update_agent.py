@@ -70,7 +70,7 @@ class SelfUpdateMixin:
         self._release_channel_cmd_topic = command_topic
 
         payload = {
-            "name": "TuxD Agent Release Channel",
+            "name": self.tr("TuxD Agent Release Channel"),
             "state_topic": state_topic,
             "command_topic": command_topic,
             "options": [_RELEASE_CHANNEL_LABELS[c] for c in _RELEASE_CHANNELS],

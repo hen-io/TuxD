@@ -66,11 +66,18 @@ mqtt:
 
 device:
   name: ""
+  # en | nb - language for built-in entity names and select options (e.g.
+  # TugBoat's "Select stack..."). Entity ids are not affected.
+  language: "en"
   tty_output: false
   refresh_entities: 300
   sampling_interval: 1
   log_to_file: false
   log_level: "error"
+  # Written only when the agent crashes (an unhandled error in the main
+  # program or a background thread): logs/crashreport_dd_mm_yy_hh_mm_ss.log
+  # with the error and the latest output before it.
+  crash_report: true
   discovery_settle_delay: 2.0
   # Debounce before a config-entity change (any cfgnum/cfgsw/cfgtxt/select
   # write, e.g. picking a release channel) actually restarts the agent - a

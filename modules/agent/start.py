@@ -4,6 +4,7 @@ import datetime
 
 from .base_mqtt import HAMQTTBase
 from .shared import entity_object_id
+from .i18n import resolve_language, translate
 from .base_direct import HADirectBase
 from .terminal import TerminalMixin
 from .live_tty import LiveTtyMixin
@@ -57,6 +58,7 @@ class TuxDAgentMixin(
         self._update_checker = update_checker
         self._update_applier = update_applier
         self._startup_time = datetime.datetime.now().strftime("%H:%M:%S %d.%m.%y")
+        self.language = resolve_language((config.get("device") or {}).get("language"))
 
         self.init_terminal()
         self.init_live_tty()
@@ -79,9 +81,12 @@ class TuxDAgentMixin(
         self.init_config_texts()
         self.init_system_status()
 
+    def tr(self, text):
+        return translate(self.language, text)
+
     def _sensor_discovery(self, object_id, name, state_topic, unit=None, icon=None, attributes_topic=None, ha_object_id=None, state_class=None, entity_category=None, device_class=None):
         payload = {
-            "name": name,
+            "name": self.tr(name),
             "state_topic": state_topic,
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,
@@ -109,7 +114,7 @@ class TuxDAgentMixin(
 
     def _binary_sensor_discovery(self, object_id, name, state_topic, device_class=None, icon=None, attributes_topic=None, entity_category=None):
         payload = {
-            "name": name,
+            "name": self.tr(name),
             "state_topic": state_topic,
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,
@@ -134,7 +139,7 @@ class TuxDAgentMixin(
 
     def _update_discovery(self, object_id, name, state_topic, command_topic=None, device_class=None, icon=None, entity_category=None, ha_object_id=None, payload_install="INSTALL", attributes_topic=None):
         payload = {
-            "name": name,
+            "name": self.tr(name),
             "state_topic": state_topic,
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,
@@ -163,7 +168,7 @@ class TuxDAgentMixin(
         state_topic = state_topic or f"{self.base_topic}/{object_id}"
 
         payload = {
-            "name": name,
+            "name": self.tr(name),
             "command_topic": command_topic,
             "state_topic": state_topic,
             "cmd_t": command_topic,
@@ -186,7 +191,7 @@ class TuxDAgentMixin(
 
     def _button_discovery(self, object_id, name, command_topic, icon=None, entity_category=None):
         payload = {
-            "name": name,
+            "name": self.tr(name),
             "command_topic": command_topic,
             "unique_id": f"{self.config['device']['name']}_{object_id}",
             "device": self.device_info,

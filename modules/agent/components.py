@@ -86,14 +86,18 @@ class ComponentSensorsMixin:
         )
         self.publish(f"{self.base_topic}/startup_time", self._startup_time, retain=True)
 
-        self._sensor_discovery(
-            "mqtt_base_topic",
-            "MQTT Base Topic",
-            f"{self.base_topic}/mqtt_base_topic",
-            icon="mdi:folder-network",
-            entity_category="config"
-        )
-        self.publish(f"{self.base_topic}/mqtt_base_topic", self.base_topic, retain=True)
+        mode = str((self.config.get("tuxd") or {}).get("connection_mode", "mqtt")).strip().lower()
+        if mode == "direct":
+            self.publish(self._discovery_topic("sensor", "mqtt_base_topic"), "", retain=True)
+        else:
+            self._sensor_discovery(
+                "mqtt_base_topic",
+                "MQTT Base Topic",
+                f"{self.base_topic}/mqtt_base_topic",
+                icon="mdi:folder-network",
+                entity_category="config"
+            )
+            self.publish(f"{self.base_topic}/mqtt_base_topic", self.base_topic, retain=True)
 
         self._sensor_discovery(
             "agent_icon",

@@ -5,9 +5,6 @@ import threading
 from .shared import slugify as _slug
 from modules.tugboat import ACTIONS, read_status, run_command, stack_names
 
-_STACK_PLACEHOLDER = "Select stack..."
-_ACTION_PLACEHOLDER = "Select action..."
-
 
 class TugboatMixin:
 
@@ -18,8 +15,11 @@ class TugboatMixin:
         self._tugboat_python_bin = str(cfg.get("python_bin") or "python3").strip() or "python3"
         self._tugboat_interval = float(cfg.get("update_interval", 30))
         self._tugboat_known_stacks = []
-        self._tugboat_selected_stack = _STACK_PLACEHOLDER
-        self._tugboat_selected_action = _ACTION_PLACEHOLDER
+        self._tugboat_stack_placeholder = self.tr("Select stack...")
+        self._tugboat_action_placeholder = self.tr("Select action...")
+        self._tugboat_actions = {self.tr(label): flag for label, flag in ACTIONS.items()}
+        self._tugboat_selected_stack = self._tugboat_stack_placeholder
+        self._tugboat_selected_action = self._tugboat_action_placeholder
         self._tugboat_running = False
 
     def _tugboat_active(self):
@@ -54,7 +54,7 @@ class TugboatMixin:
         slug = _slug(name)
         self._sensor_discovery(
             f"tugboat_{slug}_health",
-            f"{name} Health",
+            f"{name} {self.tr('Health')}",
             f"{self.base_topic}/tugboat/{slug}/health",
             icon="mdi:ferry",
             attributes_topic=f"{self.base_topic}/tugboat/{slug}/health_attributes",
@@ -62,12 +62,12 @@ class TugboatMixin:
         )
 
     def _register_tugboat_selects(self):
-        stack_options = [_STACK_PLACEHOLDER] + self._tugboat_known_stacks
+        stack_options = [self._tugboat_stack_placeholder] + self._tugboat_known_stacks
         if self._tugboat_selected_stack not in stack_options:
-            self._tugboat_selected_stack = _STACK_PLACEHOLDER
+            self._tugboat_selected_stack = self._tugboat_stack_placeholder
         stack_state_topic = f"{self.base_topic}/tugboat/select_stack"
         self.publish(self._discovery_topic("select", "tugboat_select_stack"), json.dumps({
-            "name": "TugBoat Stack",
+            "name": self.tr("TugBoat Stack"),
             "state_topic": stack_state_topic,
             "command_topic": f"{stack_state_topic}/set",
             "options": stack_options,
@@ -79,10 +79,10 @@ class TugboatMixin:
         }), retain=True)
         self.publish(stack_state_topic, self._tugboat_selected_stack, retain=True)
 
-        action_options = [_ACTION_PLACEHOLDER] + list(ACTIONS.keys())
+        action_options = [self._tugboat_action_placeholder] + list(self._tugboat_actions)
         action_state_topic = f"{self.base_topic}/tugboat/select_action"
         self.publish(self._discovery_topic("select", "tugboat_select_action"), json.dumps({
-            "name": "TugBoat Action",
+            "name": self.tr("TugBoat Action"),
             "state_topic": action_state_topic,
             "command_topic": f"{action_state_topic}/set",
             "options": action_options,
@@ -95,7 +95,7 @@ class TugboatMixin:
         self.publish(action_state_topic, self._tugboat_selected_action, retain=True)
 
         self.publish(self._discovery_topic("button", "tugboat_execute"), json.dumps({
-            "name": "TugBoat Execute",
+            "name": self.tr("TugBoat Execute"),
             "command_topic": f"{self.base_topic}/tugboat/execute/set",
             "unique_id": f"{self.config['device']['name']}_tugboat_execute",
             "device": self.device_info,
@@ -115,6 +115,8 @@ class TugboatMixin:
             self._register_tugboat_selects()
 
         for name, info in stacks.items():
+            if not isinstance(info, dict):
+                continue
             slug = _slug(name)
             base = f"{self.base_topic}/tugboat/{slug}"
             self.publish(f"{base}/health", str(info.get("health") or "unknown"))
@@ -138,14 +140,14 @@ class TugboatMixin:
 
     def handle_tugboat_stack_select(self, payload):
         value = payload.strip()
-        if value not in ([_STACK_PLACEHOLDER] + self._tugboat_known_stacks):
+        if value not in ([self._tugboat_stack_placeholder] + self._tugboat_known_stacks):
             return
         self._tugboat_selected_stack = value
         self.publish(f"{self.base_topic}/tugboat/select_stack", value, retain=True)
 
     def handle_tugboat_action_select(self, payload):
         value = payload.strip()
-        if value not in ([_ACTION_PLACEHOLDER] + list(ACTIONS.keys())):
+        if value not in ([self._tugboat_action_placeholder] + list(self._tugboat_actions)):
             return
         self._tugboat_selected_action = value
         self.publish(f"{self.base_topic}/tugboat/select_action", value, retain=True)
@@ -153,9 +155,9 @@ class TugboatMixin:
     def handle_tugboat_execute(self):
         if self._tugboat_running:
             return
-        if self._tugboat_selected_stack == _STACK_PLACEHOLDER:
+        if self._tugboat_selected_stack == self._tugboat_stack_placeholder:
             return
-        if self._tugboat_selected_action == _ACTION_PLACEHOLDER:
+        if self._tugboat_selected_action == self._tugboat_action_placeholder:
             return
         self._tugboat_running = True
         threading.Thread(
@@ -165,7 +167,7 @@ class TugboatMixin:
         ).start()
 
     def _run_tugboat_action(self, stack, action):
-        flag = ACTIONS.get(action)
+        flag = self._tugboat_actions.get(action)
         try:
             with self.busy(f"tugboat: {action} {stack}"):
                 output = run_command(self._tugboat_python_bin, self._tugboat_path, flag, stack)
@@ -181,10 +183,10 @@ class TugboatMixin:
             if status:
                 self._publish_tugboat_status(status)
         finally:
-            self._tugboat_selected_stack = _STACK_PLACEHOLDER
-            self._tugboat_selected_action = _ACTION_PLACEHOLDER
-            self.publish(f"{self.base_topic}/tugboat/select_stack", _STACK_PLACEHOLDER, retain=True)
-            self.publish(f"{self.base_topic}/tugboat/select_action", _ACTION_PLACEHOLDER, retain=True)
+            self._tugboat_selected_stack = self._tugboat_stack_placeholder
+            self._tugboat_selected_action = self._tugboat_action_placeholder
+            self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_stack_placeholder, retain=True)
+            self.publish(f"{self.base_topic}/tugboat/select_action", self._tugboat_action_placeholder, retain=True)
             self._tugboat_running = False
 
     def tugboat_loop(self):

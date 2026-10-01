@@ -17,8 +17,10 @@ import urllib.request
 import ast
 import datetime
 import re
+import collections
+import traceback
 
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -75,6 +77,7 @@ def _log_rotate_loop():
 
 def log_write(text: str):
     global _LOG_FILE
+    _remember_output(f"{text}\n")
     if _LOG_FILE is not None:
         try:
             ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -82,6 +85,86 @@ def log_write(text: str):
             _LOG_FILE.flush()
         except Exception:
             pass
+
+
+
+CRASH_REPORT_DIR = "logs"
+_CRASH_REPORT_MAX_PER_RUN = 10
+_RECENT_OUTPUT = collections.deque(maxlen=500)
+_RECENT_OUTPUT_LOCK = threading.Lock()
+_RECENT_PARTIAL = {"text": ""}
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+_CRASH_REPORTS_WRITTEN = 0
+
+
+def _remember_output(text):
+    try:
+        with _RECENT_OUTPUT_LOCK:
+            buf = _RECENT_PARTIAL["text"] + str(text)
+            lines = buf.split("\n")
+            _RECENT_PARTIAL["text"] = lines.pop()[-2000:]
+            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            for line in lines:
+                line = _ANSI_RE.sub("", line).rstrip("\r")
+                if line.strip():
+                    _RECENT_OUTPUT.append(f"[{ts}] {line}")
+    except Exception:
+        pass
+
+
+class _OutputTee:
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, text):
+        _remember_output(text)
+        return self._stream.write(text)
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def _write_crash_report(where, exc_type, exc, tb):
+    global _CRASH_REPORTS_WRITTEN
+    try:
+        if _CRASH_REPORTS_WRITTEN >= _CRASH_REPORT_MAX_PER_RUN:
+            return
+        _CRASH_REPORTS_WRITTEN += 1
+        now = datetime.datetime.now()
+        os.makedirs(CRASH_REPORT_DIR, exist_ok=True)
+        path = os.path.join(CRASH_REPORT_DIR, now.strftime("crashreport_%d_%m_%y_%H_%M_%S.log"))
+        with _RECENT_OUTPUT_LOCK:
+            recent = list(_RECENT_OUTPUT)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(f"TuxD {VERSION} crash report - {now.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Where: {where}\n\n")
+            f.write("".join(traceback.format_exception(exc_type, exc, tb)))
+            f.write(f"\nLatest output ({len(recent)} lines):\n")
+            f.write("\n".join(recent) + "\n\n")
+    except Exception:
+        pass
+
+
+def _install_crash_report():
+    sys.stdout = _OutputTee(sys.stdout)
+    sys.stderr = _OutputTee(sys.stderr)
+
+    prev_hook = sys.excepthook
+    prev_thread_hook = threading.excepthook
+
+    def _hook(exc_type, exc, tb):
+        if not issubclass(exc_type, KeyboardInterrupt):
+            _write_crash_report("main thread", exc_type, exc, tb)
+        prev_hook(exc_type, exc, tb)
+
+    def _thread_hook(args):
+        if args.exc_type is not SystemExit:
+            name = args.thread.name if args.thread is not None else "unknown"
+            _write_crash_report(f"thread {name}", args.exc_type, args.exc_value, args.exc_traceback)
+        prev_thread_hook(args)
+
+    sys.excepthook = _hook
+    threading.excepthook = _thread_hook
 
 
 def c(text, *styles):
@@ -1243,6 +1326,8 @@ def main():
 
     device_cfg = (cfg or {}).get("device", {}) or {}
     log_to_file = bool(device_cfg.get("log_to_file", False))
+    if bool(device_cfg.get("crash_report", True)):
+        _install_crash_report()
     log_level = str(device_cfg.get("log_level", "all")).lower().strip()
     if log_level not in ("all", "error"):
         log_level = "all"
