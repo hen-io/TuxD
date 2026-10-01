@@ -303,6 +303,10 @@ class TuxDAgentMixin(
             self.handle_tugboat_action_select(payload)
             return
 
+        if topic == f"{self.base_topic}/tugboat/execute/set":
+            self.handle_tugboat_execute()
+            return
+
         if topic == f"{self.base_topic}/host_update/set":
             self.handle_host_update_install()
             return

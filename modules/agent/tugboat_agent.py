@@ -94,6 +94,16 @@ class TugboatMixin:
         }), retain=True)
         self.publish(action_state_topic, self._tugboat_selected_action, retain=True)
 
+        self.publish(self._discovery_topic("button", "tugboat_execute"), json.dumps({
+            "name": "TugBoat Execute",
+            "command_topic": f"{self.base_topic}/tugboat/execute/set",
+            "unique_id": f"{self.config['device']['name']}_tugboat_execute",
+            "device": self.device_info,
+            "icon": "mdi:play-circle-outline",
+            "entity_category": "config",
+            "default_entity_id": f"button.{self.device_slug}_tugboat_execute",
+        }), retain=True)
+
     def _publish_tugboat_status(self, status):
         stacks = status.get("stacks", {})
         new_names = sorted(stacks.keys())
@@ -132,7 +142,6 @@ class TugboatMixin:
             return
         self._tugboat_selected_stack = value
         self.publish(f"{self.base_topic}/tugboat/select_stack", value, retain=True)
-        self._tugboat_maybe_run()
 
     def handle_tugboat_action_select(self, payload):
         value = payload.strip()
@@ -140,9 +149,8 @@ class TugboatMixin:
             return
         self._tugboat_selected_action = value
         self.publish(f"{self.base_topic}/tugboat/select_action", value, retain=True)
-        self._tugboat_maybe_run()
 
-    def _tugboat_maybe_run(self):
+    def handle_tugboat_execute(self):
         if self._tugboat_running:
             return
         if self._tugboat_selected_stack == _STACK_PLACEHOLDER:
