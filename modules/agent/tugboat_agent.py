@@ -187,29 +187,32 @@ class TugboatMixin:
 
     @staticmethod
     def _tugboat_image_state(ref, img):
-        def short(digest):
-            return str(digest or "").split(":")[-1][:12]
-
         status = str(img.get("status") or "unknown")
-        local = short(img.get("local_digest"))
-        remote = short(img.get("remote_digest"))
         detail = str(img.get("detail") or "")
+        source = str(img.get("source_url") or "").strip()
         outdated = status in ("update_available", "not_pulled")
 
-        installed = local or status
+        tail = ref.rsplit("/", 1)[-1]
+        tag = tail.split(":", 1)[1] if ":" in tail else "latest"
+        installed = str(img.get("local_version") or "").strip() or tag
+        latest = str(img.get("remote_version") or "").strip() or tag
+
         state = {
             "installed_version": installed,
             "latest_version": installed,
             "title": ref,
             "in_progress": False,
         }
+        if source:
+            github = source.startswith("https://github.com/") and source.rstrip("/").count("/") == 4
+            state["release_url"] = source.rstrip("/") + "/releases" if github else source
         if outdated:
-            state["latest_version"] = remote if remote and remote != installed else "update"
-            lines = [detail or "Newer image available in registry."]
-            if img.get("local_digest"):
-                lines.append(f"Local: {img.get('local_digest')}")
-            if img.get("remote_digest"):
-                lines.append(f"Registry: {img.get('remote_digest')}")
+            state["latest_version"] = latest if latest != installed else f"{installed} (new image)"
+            lines = [f"Current: {installed}", f"New: {state['latest_version']}"]
+            if detail:
+                lines.append(detail)
+            if source:
+                lines.append(f"Changelog / source: {state['release_url']}")
             state["release_summary"] = "\n".join(lines)
         elif detail:
             state["release_summary"] = detail

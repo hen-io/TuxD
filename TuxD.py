@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.5.8"
+VERSION = "1.5.9"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
