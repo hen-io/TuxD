@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -1318,14 +1318,17 @@ def main():
         sys.exit(EXIT_CONFIG_ERROR)
 
     extra_config_path = (cfg.get("device") or {}).get("extra_config_path", "")
+    extra_config_error = ""
     if extra_config_path:
         try:
             extra_cfg = yaml.safe_load(Path(extra_config_path).read_text(encoding="utf-8")) or {}
-            if isinstance(extra_cfg, dict):
-                from modules.config_sync import merge_extra_config
-                merge_extra_config(cfg, extra_cfg)
+            if not isinstance(extra_cfg, dict):
+                raise ValueError("not a YAML mapping")
+            from modules.config_sync import merge_extra_config
+            merge_extra_config(cfg, extra_cfg)
         except Exception as e:
-            log_write(f"Failed to load extra config ({extra_config_path}): {e}")
+            extra_config_error = f"Failed to load extra config ({extra_config_path}): {e}"
+            log_write(extra_config_error)
 
     device_cfg = (cfg or {}).get("device", {}) or {}
     log_to_file = bool(device_cfg.get("log_to_file", False))
@@ -1493,6 +1496,7 @@ def main():
                 log_write(f"Agent init failed: {repr(e)}")
                 _publish_emergency_error(cfg, f"Startup failed: {e}")
                 sys.exit(EXIT_CONFIG_ERROR)
+            agent._startup_error = extra_config_error
             _AGENT = agent
 
             def _on_agent_ready():

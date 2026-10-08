@@ -7,6 +7,7 @@ class SystemStatusMixin:
     def init_system_status(self):
         self._error_active = False
         self._error_reason = ""
+        self._startup_error = ""
         self._busy_count = 0
         self._busy_lock = threading.Lock()
         self._busy_jobs = []
@@ -44,7 +45,7 @@ class SystemStatusMixin:
         )
 
         if not self._error_active:
-            self.set_error(False)
+            self.set_error(bool(self._startup_error), self._startup_error)
         self.publish(f"{self.base_topic}/busy", "ON" if self._busy_count > 0 else "OFF")
         self._publish_busy_job()
 
