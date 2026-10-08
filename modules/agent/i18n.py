@@ -48,6 +48,8 @@ _NB = {
     "Update and reboot": "Oppdater og start på nytt",
     "TuxD Agent Release Channel": "TuxD-agent utgivelseskanal",
     "Restart TuxD": "Start TuxD på nytt",
+    "Reboot": "Start på nytt",
+    "Shutdown": "Slå av",
     "Refresh TuxD Entities": "Oppdater TuxD-entiteter",
     "Force Refresh All Sensors": "Tving oppdatering av alle sensorer",
     "Error": "Feil",

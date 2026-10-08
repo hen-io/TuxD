@@ -108,6 +108,10 @@ device:
   # (e.g. the device-status grid card) - purely cosmetic, has no effect on
   # any Home Assistant entity/device icon.
   agent_icon: "mdi:server"
+  # Commands for the built-in "Reboot" and "Shutdown" buttons.
+  # Empty = "sudo reboot" / "sudo shutdown now".
+  reboot_cmd: ""
+  shutdown_cmd: ""
 
 #################################
 # Components                    #

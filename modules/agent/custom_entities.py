@@ -4,10 +4,30 @@ import threading
 from .shared import run_cmd
 
 
+_POWER_BUTTONS = {
+    "reboot": ("Reboot", "reboot_cmd", "mdi:restart", "sudo reboot"),
+    "shutdown": ("Shutdown", "shutdown_cmd", "mdi:power", "sudo shutdown now"),
+}
+
+
 class CustomEntitiesMixin:
     def init_custom(self):
         self.custom_sensors = self.config.get("sensor", []) or []
-        self.custom_buttons = self.config.get("button", []) or []
+
+        device = self.config.get("device", {}) or {}
+        legacy = {}
+        kept = []
+        for b in self.config.get("button", []) or []:
+            slug = str(b.get("name", "")).replace(" ", "_").lower() if isinstance(b, dict) else ""
+            if slug in _POWER_BUTTONS:
+                legacy[slug] = b.get("command") or b.get("cmd", "")
+            else:
+                kept.append(b)
+        power = [
+            {"name": name, "command": device.get(key) or legacy.get(slug) or default, "icon": icon}
+            for slug, (name, key, icon, default) in _POWER_BUTTONS.items()
+        ]
+        self.custom_buttons = power + kept
 
     def register_custom_sensors(self):
         for s in self.custom_sensors:

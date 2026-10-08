@@ -133,6 +133,29 @@ def _migrate_update_buttons(config: dict) -> bool:
     return changed
 
 
+def _migrate_power_buttons(config: dict) -> bool:
+    buttons = config.get('button')
+    device = config.get('device')
+    if not isinstance(buttons, list) or not isinstance(device, dict):
+        return False
+
+    targets = {'reboot': 'reboot_cmd', 'shutdown': 'shutdown_cmd'}
+    kept = []
+    changed = False
+    for entry in buttons:
+        key = targets.get(str(entry.get('name', '')).strip().lower()) if isinstance(entry, dict) else None
+        if key is None:
+            kept.append(entry)
+            continue
+        cmd = entry.get('command') or entry.get('cmd') or ''
+        if cmd and not device.get(key):
+            device[key] = cmd
+        changed = True
+    if changed:
+        config['button'] = kept
+    return changed
+
+
 def _reorder_like_defaults(config, defaults):
     if not isinstance(config, dict) or not isinstance(defaults, dict):
         return config
@@ -289,6 +312,8 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     migration_changed = _migrate_interval_keys(config)
     yaml_changed = _deep_merge_defaults(config, defaults)
     if _migrate_update_buttons(config):
+        migration_changed = True
+    if _migrate_power_buttons(config):
         migration_changed = True
     item_defaults_changed = _apply_item_defaults(config, item_defaults)
 
