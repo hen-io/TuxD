@@ -8,6 +8,7 @@ class SystemStatusMixin:
         self._error_active = False
         self._error_reason = ""
         self._startup_error = ""
+        self._standing_errors = {}
         self._busy_count = 0
         self._busy_lock = threading.Lock()
         self._busy_jobs = []
@@ -44,8 +45,9 @@ class SystemStatusMixin:
             entity_category="diagnostic",
         )
 
-        if not self._error_active:
-            self.set_error(bool(self._startup_error), self._startup_error)
+        standing = self._standing_error()
+        if not self._error_active or self._error_reason == standing:
+            self.set_error(bool(standing), standing)
         self.publish(f"{self.base_topic}/busy", "ON" if self._busy_count > 0 else "OFF")
         self._publish_busy_job()
 
@@ -58,6 +60,22 @@ class SystemStatusMixin:
             json.dumps({"reason": self._error_reason}),
         )
         self.publish(f"{self.base_topic}/error_reason", self._error_reason)
+
+    def _standing_error(self):
+        reasons = [self._startup_error] + list(self._standing_errors.values())
+        return "; ".join(r for r in reasons if r)
+
+    def set_standing_error(self, key, reason):
+        if self._standing_errors.get(key, "") == reason:
+            return
+        before = self._standing_error()
+        if reason:
+            self._standing_errors[key] = reason
+        else:
+            self._standing_errors.pop(key, None)
+        if not self._error_active or self._error_reason == before:
+            standing = self._standing_error()
+            self.set_error(bool(standing), standing)
 
     def _publish_busy_job(self):
         if not self._busy_jobs:

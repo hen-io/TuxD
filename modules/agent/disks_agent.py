@@ -216,6 +216,9 @@ class DisksMixin:
                     self.publish(f"{base}/used_space_gb", round(space["used_gb"], decimals))
                     self.publish(f"{base}/free_space_gb", round(space["free_gb"], decimals))
                     self.publish(f"{base}/used_space", round(space["used_pct"], decimals))
+                    if mount == "/":
+                        full = round(space["used_pct"], 1) >= 100
+                        self.set_standing_error("root_full", "Root storage is full" if full else "")
 
                     self.update_global_disk_totals()
 
