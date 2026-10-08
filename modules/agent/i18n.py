@@ -55,6 +55,7 @@ _NB = {
     "Error": "Feil",
     "Error Reason": "Feilårsak",
     "Busy": "Opptatt",
+    "Agent is offline!": "Agenten er offline!",
     "Current Job": "Gjeldende jobb",
     "High Latency": "Høy forsinkelse",
     "Terminal Input": "Terminal inndata",
