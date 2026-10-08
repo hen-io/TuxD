@@ -45,6 +45,7 @@ _NB = {
         "Installasjon fra Home Assistant er slått av (host_update.allow_install: false).",
     "TuxD Agent Update": "TuxD-agentoppdatering",
     "Check for TuxD Agent Updates": "Se etter TuxD-agentoppdateringer",
+    "Update and reboot": "Oppdater og start på nytt",
     "TuxD Agent Release Channel": "TuxD-agent utgivelseskanal",
     "Restart TuxD": "Start TuxD på nytt",
     "Refresh TuxD Entities": "Oppdater TuxD-entiteter",

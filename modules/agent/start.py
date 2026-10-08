@@ -274,7 +274,11 @@ class TuxDAgentMixin(
             return
 
         if topic.startswith(f"{self.base_topic}/custom_button/") and topic.endswith("/set"):
-            self.handle_custom_button(topic)
+            slug = topic.split("/")[-2]
+            if slug in self._host_update_button_cmds:
+                self.handle_host_update_button(slug)
+            else:
+                self.handle_custom_button(topic)
             return
 
         if topic.startswith(f"{self.base_topic}/select/") and topic.endswith("/set"):

@@ -6,10 +6,38 @@ from .shared import run_cmd
 from modules.host_update import update_count, update_list, default_install_cmd, parse_leading_int
 
 
+_STANDARD_BUTTONS = {
+    "update": ("Update", "update_cmd", "mdi:package-up"),
+    "update_and_reboot": ("Update and reboot", "update_reboot_cmd", "mdi:restart-alert"),
+}
+
+_BUTTON_ALIASES = {"update_&_reboot": "update_and_reboot"}
+
+
 class HostUpdateMixin:
     def init_host_update(self):
         self._host_update_installing = False
         self._host_update_last_state = None
+        self._host_update_button_cmds = {}
+
+        cfg = self.config.get("host_update", {}) or {}
+        if not cfg.get("enabled", False):
+            return
+
+        legacy = {}
+        kept = []
+        for b in self.custom_buttons:
+            slug = str(b.get("name", "")).replace(" ", "_").lower() if isinstance(b, dict) else ""
+            slug = _BUTTON_ALIASES.get(slug, slug)
+            if slug in _STANDARD_BUTTONS:
+                legacy[slug] = b.get("command") or b.get("cmd", "")
+            else:
+                kept.append(b)
+        self.custom_buttons = kept
+
+        defaults = {"update": default_install_cmd(), "update_and_reboot": f"{default_install_cmd()} && sudo reboot"}
+        for slug, (_name, key, _icon) in _STANDARD_BUTTONS.items():
+            self._host_update_button_cmds[slug] = cfg.get(key) or legacy.get(slug) or defaults[slug]
 
     def register_host_update(self):
         cfg = self.config.get("host_update", {}) or {}
@@ -23,6 +51,15 @@ class HostUpdateMixin:
             command_topic = f"{base}/set"
 
         device_class = cfg.get("device_class", "") or None
+
+        for slug, (name, _key, icon) in _STANDARD_BUTTONS.items():
+            self._button_discovery(
+                f"custom_button_{slug}",
+                name,
+                f"{self.base_topic}/custom_button/{slug}/set",
+                icon=icon,
+            )
+            self.client.subscribe(f"{self.base_topic}/custom_button/{slug}/set")
 
         self._update_discovery(
             "host_update",
@@ -170,6 +207,10 @@ class HostUpdateMixin:
         name = str(cfg.get("install_button_name") or "Update and reboot").strip().lower()
         if not name:
             return None
+        slug = name.replace(" ", "_")
+        standard = self._host_update_button_cmds.get(_BUTTON_ALIASES.get(slug, slug))
+        if standard:
+            return standard
         for b in (self.config.get("button") or []):
             if isinstance(b, dict) and str(b.get("name", "")).strip().lower() == name:
                 cmd = b.get("command")
@@ -193,6 +234,42 @@ class HostUpdateMixin:
             return self.tr("Installing from Home Assistant is disabled (host_update.allow_install: false).")
         cmd, source = self._host_update_install_plan(cfg)
         return f'{self.tr("Install runs")} ({source}): {cmd}'
+
+    def handle_host_update_button(self, slug):
+        cmd = self._host_update_button_cmds.get(slug)
+        if not cmd or self._host_update_installing:
+            return
+        self._host_update_installing = True
+        threading.Thread(target=self._run_host_update_button, args=(slug, cmd), daemon=True).start()
+
+    def _run_host_update_button(self, slug, cmd):
+        name = _STANDARD_BUTTONS[slug][0]
+        try:
+            if self._terminal_output_enabled():
+                self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: Button "{name}" pressed! > {cmd}')
+            if slug == "update_and_reboot":
+                self.set_error(True, f'"{name}" button triggered a reboot/shutdown')
+            self._set_host_update_progress(True)
+            with self.busy(f"button: {name}"):
+                out = run_cmd(cmd)
+            if out and self._terminal_output_enabled():
+                for line in out.splitlines():
+                    if line:
+                        self.publish(self.terminal_output_topic, line)
+        except Exception:
+            pass
+        finally:
+            self._host_update_installing = False
+
+        try:
+            cfg = self.config.get("host_update", {}) or {}
+            source = (cfg.get("count_source") or "updates_available").strip()
+            if source:
+                self.refresh_status_command(source)
+            if not self._publish_host_update_state():
+                self._set_host_update_progress(False)
+        except Exception:
+            self._set_host_update_progress(False)
 
     def handle_host_update_install(self):
         cfg = self.config.get("host_update", {}) or {}

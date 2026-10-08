@@ -263,6 +263,10 @@ host_update:
   check_cmd: ""
   list_cmd: ""
   install_cmd: ""
+  # Commands for the standard "Update" and "Update and reboot" buttons.
+  # Empty = the package manager's own upgrade command (plus a reboot).
+  update_cmd: ""
+  update_reboot_cmd: ""
   install_button_name: "Update and reboot"
   use_custom_install_cmd: false
   allow_install: true
