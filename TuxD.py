@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.7.0"
+VERSION = "1.7.1"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -33,6 +33,8 @@ DOWNLOAD_TIMEOUT = 5
 GITHUB_REPO = "hen-io/TuxD"
 
 FAILED_UPDATE_RETRY_SECONDS = 3600
+
+EXTRA_CONFIG_RETRY_SECONDS = 30
 
 EXIT_CONFIG_ERROR = 78
 
@@ -1332,7 +1334,10 @@ def main():
             from modules.config_sync import merge_extra_config
             merge_extra_config(cfg, extra_cfg)
         except Exception as e:
-            extra_config_error = f"Failed to load extra config ({extra_config_path}): {e}"
+            extra_config_error = (
+                f"Failed to load extra config ({extra_config_path}): {e} "
+                f"- restarting in {EXTRA_CONFIG_RETRY_SECONDS}s to retry"
+            )
             log_write(extra_config_error)
 
     device_cfg = (cfg or {}).get("device", {}) or {}
@@ -1503,6 +1508,15 @@ def main():
                 sys.exit(EXIT_CONFIG_ERROR)
             agent._startup_error = extra_config_error
             _AGENT = agent
+
+            if extra_config_error:
+                def _retry_extra_config(a=agent):
+                    if a._stop_event.wait(timeout=EXTRA_CONFIG_RETRY_SECONDS) or _SHUTDOWN_REQUESTED:
+                        return
+                    log_write(f"Extra config still not loaded - restarting TuxD to retry ({extra_config_path}).")
+                    a._hard_restart()
+
+                threading.Thread(target=_retry_extra_config, daemon=True).start()
 
             def _on_agent_ready():
                 label = "Agent started." if first_start else "Reconnected to MQTT broker!"
