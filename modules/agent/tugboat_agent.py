@@ -157,65 +157,64 @@ class TugboatMixin:
     def _publish_tugboat_images(self, stacks):
         seen = {}
         for name, info in stacks.items():
-            if not isinstance(info, dict):
+            if not isinstance(info, dict) or not isinstance(info.get("images"), list):
                 continue
             stack_slug = _slug(name)
-            for img in info.get("images") or []:
-                if not isinstance(img, dict) or not img.get("image"):
-                    continue
-                ref = str(img["image"]).split("@", 1)[0]
-                image_slug = _slug(ref)
-                oid = f"tugboat_image_{stack_slug}_{image_slug}"
-                topic = f"{self.base_topic}/tugboat/image/{stack_slug}/{image_slug}"
-                if oid not in self._tugboat_images:
-                    self._update_discovery(
-                        oid,
-                        f"{name}: {ref}",
-                        f"{topic}/state",
-                        command_topic=f"{topic}/set",
-                        icon="mdi:ferry",
-                        entity_category="diagnostic",
-                        ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}_{image_slug}",
-                    )
-                state = self._tugboat_image_state(ref, img)
-                seen[oid] = (name, f"{topic}/state", state)
-                self.publish(f"{topic}/state", json.dumps(state))
+            oid = f"tugboat_stack_{stack_slug}"
+            topic = f"{self.base_topic}/tugboat/image/{stack_slug}"
+            if oid not in self._tugboat_images:
+                self._update_discovery(
+                    oid,
+                    f"{name} {self.tr('image updates')}",
+                    f"{topic}/state",
+                    command_topic=f"{topic}/set",
+                    icon="mdi:ferry",
+                    entity_category="diagnostic",
+                    ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}",
+                )
+            state = self._tugboat_stack_state(name, info["images"])
+            seen[oid] = (name, f"{topic}/state", state)
+            self.publish(f"{topic}/state", json.dumps(state))
 
         for oid in set(self._tugboat_images) - set(seen):
             self.publish(self._discovery_topic("update", oid), "", retain=True)
         self._tugboat_images = seen
 
     @staticmethod
-    def _tugboat_image_state(ref, img):
-        status = str(img.get("status") or "unknown")
-        detail = str(img.get("detail") or "")
-        source = str(img.get("source_url") or "").strip()
-        outdated = status in ("update_available", "not_pulled")
+    def _tugboat_stack_state(name, images):
+        lines = []
+        for img in images:
+            if not isinstance(img, dict) or not img.get("image"):
+                continue
+            if str(img.get("status") or "") not in ("update_available", "not_pulled"):
+                continue
+            ref = str(img["image"]).split("@", 1)[0]
+            tail = ref.rsplit("/", 1)[-1]
+            tag = tail.split(":", 1)[1] if ":" in tail else "latest"
+            installed = str(img.get("local_version") or "").strip() or tag
+            latest = str(img.get("remote_version") or "").strip() or tag
+            if latest == installed:
+                latest = f"{installed} (new image)"
 
-        tail = ref.rsplit("/", 1)[-1]
-        tag = tail.split(":", 1)[1] if ":" in tail else "latest"
-        installed = str(img.get("local_version") or "").strip() or tag
-        latest = str(img.get("remote_version") or "").strip() or tag
+            services = ", ".join(str(s) for s in (img.get("services") or []))
+            line = f"- {services or '?'}: {ref}, {installed} -> {latest}"
+            detail = str(img.get("detail") or "").strip()
+            if detail:
+                line += f" ({detail})"
+            source = str(img.get("source_url") or "").strip()
+            if source:
+                github = source.startswith("https://github.com/") and source.rstrip("/").count("/") == 4
+                line += f" - {source.rstrip('/') + '/releases' if github else source}"
+            lines.append(line)
 
         state = {
-            "installed_version": installed,
-            "latest_version": installed,
-            "title": ref,
+            "installed_version": "0",
+            "latest_version": str(len(lines)),
+            "title": name,
             "in_progress": False,
         }
-        if source:
-            github = source.startswith("https://github.com/") and source.rstrip("/").count("/") == 4
-            state["release_url"] = source.rstrip("/") + "/releases" if github else source
-        if outdated:
-            state["latest_version"] = latest if latest != installed else f"{installed} (new image)"
-            lines = [f"Current: {installed}", f"New: {state['latest_version']}"]
-            if detail:
-                lines.append(detail)
-            if source:
-                lines.append(f"Changelog / source: {state['release_url']}")
+        if lines:
             state["release_summary"] = "\n".join(lines)
-        elif detail:
-            state["release_summary"] = detail
         return state
 
     def handle_tugboat_image_install(self, topic):

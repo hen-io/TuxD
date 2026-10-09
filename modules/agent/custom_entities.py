@@ -96,7 +96,7 @@ class CustomEntitiesMixin:
                 cmd_lower = cmd.lower()
                 if any(kw in cmd_lower for kw in ("shutdown", "reboot", "poweroff", "halt")):
                     try:
-                        self.set_error(True, f'"{b["name"]}" button triggered a reboot/shutdown')
+                        self.set_warning(True, f'"{b["name"]}" button triggered a reboot/shutdown')
                     except Exception:
                         pass
                 if write_to_terminal:

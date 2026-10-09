@@ -248,7 +248,7 @@ class HostUpdateMixin:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: Button "{name}" pressed! > {cmd}')
             if slug == "update_and_reboot":
-                self.set_error(True, f'"{name}" button triggered a reboot/shutdown')
+                self.set_warning(True, f'"{name}" button triggered a reboot/shutdown')
             self._set_host_update_progress(True)
             with self.busy(f"button: {name}"):
                 out = run_cmd(cmd)
@@ -270,6 +270,11 @@ class HostUpdateMixin:
                 self._set_host_update_progress(False)
         except Exception:
             self._set_host_update_progress(False)
+        if slug == "update_and_reboot":
+            try:
+                self.set_warning(False)
+            except Exception:
+                pass
 
     def handle_host_update_install(self):
         cfg = self.config.get("host_update", {}) or {}
@@ -289,7 +294,7 @@ class HostUpdateMixin:
     def _run_host_update_install(self, cmd):
         self._set_host_update_progress(True)
         try:
-            self.set_error(True, "Host update running - host may reboot")
+            self.set_warning(True, "Host update running - host may reboot")
         except Exception:
             pass
         try:

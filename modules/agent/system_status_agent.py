@@ -9,6 +9,8 @@ class SystemStatusMixin:
         self._error_reason = ""
         self._startup_error = ""
         self._standing_errors = {}
+        self._warning_active = False
+        self._warning_reason = ""
         self._busy_count = 0
         self._busy_lock = threading.Lock()
         self._busy_jobs = []
@@ -31,6 +33,21 @@ class SystemStatusMixin:
             entity_category="diagnostic",
         )
         self._binary_sensor_discovery(
+            "system_warning",
+            "Warning",
+            f"{self.base_topic}/warning",
+            icon="mdi:alert",
+            attributes_topic=f"{self.base_topic}/warning_attributes",
+            entity_category="diagnostic",
+        )
+        self._sensor_discovery(
+            "system_warning_reason",
+            "Warning Reason",
+            f"{self.base_topic}/warning_reason",
+            icon="mdi:alert-outline",
+            entity_category="diagnostic",
+        )
+        self._binary_sensor_discovery(
             "system_busy",
             "Busy",
             f"{self.base_topic}/busy",
@@ -48,8 +65,19 @@ class SystemStatusMixin:
         standing = self._standing_error()
         if not self._error_active or self._error_reason == standing:
             self.set_error(bool(standing), standing)
+        self.set_warning(self._warning_active, self._warning_reason)
         self.publish(f"{self.base_topic}/busy", "ON" if self._busy_count > 0 else "OFF")
         self._publish_busy_job()
+
+    def set_warning(self, active, reason=""):
+        self._warning_active = bool(active)
+        self._warning_reason = reason if active else ""
+        self.publish(f"{self.base_topic}/warning", "ON" if self._warning_active else "OFF")
+        self.publish(
+            f"{self.base_topic}/warning_attributes",
+            json.dumps({"reason": self._warning_reason}),
+        )
+        self.publish(f"{self.base_topic}/warning_reason", self._warning_reason)
 
     def set_error(self, active, reason=""):
         self._error_active = bool(active)

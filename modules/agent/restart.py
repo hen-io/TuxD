@@ -60,7 +60,7 @@ class RestartMixin:
                     except Exception:
                         pass
                 try:
-                    self.set_error(True, "Restart button pressed")
+                    self.set_warning(True, "Restart button pressed")
                 except Exception:
                     pass
                 time.sleep(1.0)
