@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.7.1"
+VERSION = "1.7.2"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -1299,12 +1299,7 @@ def main():
     _db = _db_read()
     _last_status = _db.get("process_status")
     if _last_status is not None and _last_status != "Clean shutdown":
-        try:
-            os.remove(_DB_FILE)
-        except FileNotFoundError:
-            pass
-        os.execv(sys.executable, [sys.executable] + sys.argv)
-        return
+        _db = {k: _db[k] for k in ("last_auto_update_check",) if k in _db}
 
     _db["process_status"] = "running"
     _db_write(_db)

@@ -1,6 +1,7 @@
 import getpass
 import os
 import select
+import signal
 import subprocess
 import threading
 import time
@@ -153,6 +154,7 @@ class TerminalMixin:
                 text=True,
                 bufsize=1,
                 cwd=os.path.expanduser("~"),
+                start_new_session=True,
             )
         except Exception as e:
             on_line(f"ERR: {e}")
@@ -184,12 +186,20 @@ class TerminalMixin:
                     break
         finally:
             if proc.poll() is None:
-                try:
-                    proc.terminate()
+                def _signal_group(sig):
                     try:
-                        proc.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
+                        os.killpg(proc.pid, sig)
+                    except Exception:
+                        try:
+                            proc.send_signal(sig)
+                        except Exception:
+                            pass
+
+                _signal_group(signal.SIGTERM)
+                try:
+                    proc.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    _signal_group(signal.SIGKILL)
                 except Exception:
                     pass
             try:
