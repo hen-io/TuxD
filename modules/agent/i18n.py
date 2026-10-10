@@ -19,6 +19,7 @@ _NB = {
     "TugBoat enabled": "TugBoat aktivert",
     "image updates": "image-oppdateringer",
     "since released": "siden utgivelse",
+    "TugBoat version": "TugBoat-versjon",
     "Health Alert": "Helsevarsel",
     "Off": "Av",
     "Unhealthy stacks": "Stacker med problemer",

@@ -57,6 +57,15 @@ class TugboatMixin:
         for name in self._tugboat_known_stacks:
             self._register_tugboat_stack(name)
         self._register_tugboat_selects()
+        self._sensor_discovery(
+            "tugboat_version",
+            "TugBoat version",
+            f"{self.base_topic}/tugboat/version",
+            icon="mdi:ferry",
+            attributes_topic=f"{self.base_topic}/tugboat/version_attributes",
+            entity_category="diagnostic",
+            ha_object_id=f"{self.device_slug}_tugboat_version",
+        )
         self._tugboat_images = {}
         self._tugboat_ages = set()
         if status:
@@ -193,12 +202,29 @@ class TugboatMixin:
                 "images_checked_at": info.get("images_checked_at", ""),
             }))
 
+        self._publish_tugboat_version(status)
         self._publish_tugboat_images(stacks)
         self.sync_stack_alerts("tugboat", {
             name: str(info.get("health") or "") == "unhealthy"
             or (str(info.get("health") or "") == "unknown" and bool(info.get("problems")))
             for name, info in stacks.items() if isinstance(info, dict)
         })
+
+    def _publish_tugboat_version(self, status):
+        version = str(status.get("tugboat_version") or "").strip()
+        check = status.get("release_check") if isinstance(status.get("release_check"), dict) else {}
+        latest = str(check.get("latest") or "").strip()
+        self.publish(f"{self.base_topic}/tugboat/version", version or "unknown")
+        self.publish(f"{self.base_topic}/tugboat/version_attributes", json.dumps({
+            "latest_version": latest,
+            "update_available": bool(version and latest and latest != version
+                                     and self._version_key(latest) > self._version_key(version)),
+            "checked_at": check.get("checked_at", ""),
+        }))
+
+    @staticmethod
+    def _version_key(text):
+        return tuple(int(p) for p in str(text).lstrip("v").split(".") if p.isdigit())
 
     def _publish_tugboat_images(self, stacks):
         seen = {}

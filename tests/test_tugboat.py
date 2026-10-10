@@ -131,6 +131,17 @@ class TugboatTest(unittest.TestCase):
         self.assertEqual(a.pub["t/tugboat/released/web/bazarr_2/state"], "unknown")
         self.assertEqual(json.loads(a.pub["t/tugboat/released/web/bazarr/attributes"])["version"], "v1")
 
+    def test_tugboat_version_sensor(self):
+        a = Agent()
+        a._publish_tugboat_version({"tugboat_version": "0.6.2", "release_check": {"latest": "0.6.10", "checked_at": "t"}})
+        self.assertEqual(a.pub["t/tugboat/version"], "0.6.2")
+        attrs = json.loads(a.pub["t/tugboat/version_attributes"])
+        self.assertEqual((attrs["latest_version"], attrs["update_available"]), ("0.6.10", True))
+        a._publish_tugboat_version({"tugboat_version": "0.6.2", "release_check": {"latest": "0.6.2"}})
+        self.assertFalse(json.loads(a.pub["t/tugboat/version_attributes"])["update_available"])
+        a._publish_tugboat_version({})
+        self.assertEqual(a.pub["t/tugboat/version"], "unknown")
+
     def test_days_since(self):
         self.assertIsNone(TugboatMixin._days_since("nope"))
         self.assertGreaterEqual(TugboatMixin._days_since("2020-01-01T00:00:00Z"), 2000)
