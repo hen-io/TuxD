@@ -11,6 +11,7 @@ class SystemStatusMixin:
         self._standing_errors = {}
         self._warning_active = False
         self._warning_reason = ""
+        self._standing_warnings = {}
         self._busy_count = 0
         self._busy_lock = threading.Lock()
         self._busy_jobs = []
@@ -70,6 +71,9 @@ class SystemStatusMixin:
         self._publish_busy_job()
 
     def set_warning(self, active, reason=""):
+        if not active:
+            reason = self._standing_warning()
+            active = bool(reason)
         self._warning_active = bool(active)
         self._warning_reason = reason if active else ""
         self.publish(f"{self.base_topic}/warning", "ON" if self._warning_active else "OFF")
@@ -104,6 +108,21 @@ class SystemStatusMixin:
         if not self._error_active or self._error_reason == before:
             standing = self._standing_error()
             self.set_error(bool(standing), standing)
+
+    def _standing_warning(self):
+        return "; ".join(r for r in self._standing_warnings.values() if r)
+
+    def set_standing_warning(self, key, reason):
+        if self._standing_warnings.get(key, "") == reason:
+            return
+        before = self._standing_warning()
+        if reason:
+            self._standing_warnings[key] = reason
+        else:
+            self._standing_warnings.pop(key, None)
+        if not self._warning_active or self._warning_reason == before:
+            standing = self._standing_warning()
+            self.set_warning(bool(standing), standing)
 
     def _publish_busy_job(self):
         if not self._busy_jobs:

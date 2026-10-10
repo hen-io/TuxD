@@ -42,7 +42,9 @@ class TugboatMixin:
         )
         self.publish(f"{self.base_topic}/tugboat/enabled", "ON" if active else "OFF")
 
+        self.forget_stack_alerts("tugboat")
         if not active:
+            self.sync_stack_alerts("tugboat", {})
             return
 
         status = read_status(self._tugboat_path)
@@ -153,6 +155,11 @@ class TugboatMixin:
             }))
 
         self._publish_tugboat_images(stacks)
+        self.sync_stack_alerts("tugboat", {
+            name: str(info.get("health") or "") == "unhealthy"
+            or (str(info.get("health") or "") == "unknown" and bool(info.get("problems")))
+            for name, info in stacks.items() if isinstance(info, dict)
+        })
 
     def _publish_tugboat_images(self, stacks):
         seen = {}

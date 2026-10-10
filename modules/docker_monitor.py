@@ -75,6 +75,7 @@ def _normalize_ps_entry(entry, compose_file):
         "health": health,
         "exit_code": exit_code,
         "compose_file": compose_file,
+        "project": str(entry.get("Project") or ""),
     }
 
 

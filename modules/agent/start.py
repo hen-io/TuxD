@@ -23,6 +23,7 @@ from .tasks_agent import TasksMixin
 from .lag_monitor_agent import LagMonitorMixin
 from .self_update_agent import SelfUpdateMixin
 from .config_agent import ConfigAgentMixin
+from .stack_alert_agent import StackAlertMixin
 from .select_agent import SelectMixin
 from .default_entities_agent import DefaultEntitiesMixin
 from .system_status_agent import SystemStatusMixin
@@ -48,6 +49,7 @@ class TuxDAgentMixin(
     TasksMixin,
     SelectMixin,
     ConfigAgentMixin,
+    StackAlertMixin,
     SystemStatusMixin,
 ):
     def __init__(self, config, version, log_file=None, log_level="all", update_status="Up to date",
@@ -62,6 +64,7 @@ class TuxDAgentMixin(
 
         self.init_terminal()
         self.init_live_tty()
+        self.init_stack_alerts()
         self.init_status()
         self.init_default_entities()
         self.init_components()
@@ -76,9 +79,6 @@ class TuxDAgentMixin(
         self.init_lag_monitor()
         self.init_tasks()
         self.init_selects()
-        self.init_config_numbers()
-        self.init_config_switches()
-        self.init_config_texts()
         self.init_system_status()
 
     def tr(self, text):
@@ -225,13 +225,9 @@ class TuxDAgentMixin(
             self.register_tugboat,
             self.register_host_update,
             self.register_self_update,
-            self.register_release_channel_select,
             self.register_lag_monitor,
             self.register_lm_sensors,
             self.register_selects,
-            self.register_config_numbers,
-            self.register_config_switches,
-            self.register_config_texts,
             self.register_system_status,
         )
         for registrar in registrars:
@@ -285,16 +281,8 @@ class TuxDAgentMixin(
             self.handle_select_message(topic, payload)
             return
 
-        if topic.startswith(f"{self.base_topic}/cfgnum/") and topic.endswith("/set"):
-            self.handle_config_number(topic, payload)
-            return
-
-        if topic.startswith(f"{self.base_topic}/cfgsw/") and topic.endswith("/set"):
-            self.handle_config_switch(topic, payload)
-            return
-
-        if topic.startswith(f"{self.base_topic}/cfgtxt/") and topic.endswith("/set"):
-            self.handle_config_text(topic, payload)
+        if topic.startswith(f"{self.base_topic}/stack_alert/") and topic.endswith("/set"):
+            self.handle_stack_alert_select(topic, payload)
             return
 
         if topic == f"{self.base_topic}/config/get" or topic == f"{self.base_topic}/config/set":
@@ -341,10 +329,6 @@ class TuxDAgentMixin(
             self.handle_self_update_install_from_url(payload)
             return
 
-        if topic == f"{self.base_topic}/cfgselect_self_update_release_channel/set":
-            self.handle_release_channel_select(topic, payload)
-            return
-
     def start(self, on_ready=None):
         self.connect()
 
@@ -362,16 +346,13 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/refresh/set")
         self.client.subscribe(f"{self.base_topic}/force_poll/set")
         self.client.subscribe(f"{self.base_topic}/select/+/set")
-        self.client.subscribe(f"{self.base_topic}/cfgnum/+/set")
-        self.client.subscribe(f"{self.base_topic}/cfgsw/+/set")
-        self.client.subscribe(f"{self.base_topic}/cfgtxt/+/set")
+        self.client.subscribe(f"{self.base_topic}/stack_alert/+/+/set")
         self.client.subscribe(f"{self.base_topic}/docker/update/+/set")
         self.client.subscribe(f"{self.base_topic}/host_update/set")
         self.client.subscribe(f"{self.base_topic}/host_update/check/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")
         self.client.subscribe(f"{self.base_topic}/self_update/check/set")
         self.client.subscribe(f"{self.base_topic}/self_update/install_from_url/set")
-        self.client.subscribe(f"{self.base_topic}/cfgselect_self_update_release_channel/set")
 
         if on_ready is not None:
             try:

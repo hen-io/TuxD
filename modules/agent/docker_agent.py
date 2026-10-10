@@ -45,6 +45,8 @@ class DockerMixin:
         self._docker_stat_known = set()
         self._docker_stat_meta = {}
         self._docker_last_stats = 0.0
+        self._docker_stacks = {}
+        self._docker_stack_health = {}
 
     def _docker_has_compose_file(self):
         return any(os.path.isfile(p) for p in getattr(self, "_docker_compose_files", []))
@@ -63,7 +65,9 @@ class DockerMixin:
         )
         self.publish(f"{self.base_topic}/docker/enabled", "ON" if active else "OFF")
 
+        self.forget_stack_alerts("docker")
         if not active:
+            self.sync_stack_alerts("docker", {})
             return
 
         base = f"{self.base_topic}/docker"
@@ -94,6 +98,82 @@ class DockerMixin:
         scfg = cfg.get("stats", {}) or {}
         for cname in sorted(self._docker_stat_meta.values()):
             self._stat_discovery_for(cname, scfg)
+
+        for name in sorted(self._docker_stacks.values()):
+            self._register_docker_stack(name)
+        self.sync_stack_alerts("docker", self._docker_stack_health)
+
+    def _register_docker_stack(self, name):
+        slug = _slug(name)
+        self._sensor_discovery(
+            f"docker_stack_{slug}_health",
+            f"{name} {self.tr('Health')}",
+            f"{self.base_topic}/docker/stack/{slug}/health",
+            icon="mdi:docker",
+            attributes_topic=f"{self.base_topic}/docker/stack/{slug}/health_attributes",
+            entity_category="diagnostic",
+            ha_object_id=f"{self.device_slug}_docker_{slug}_health",
+        )
+
+    def _docker_publish_stacks(self, merged_conts, bad, base):
+        stacks = {}
+        if not self._tugboat_active():
+            for path in self._docker_compose_files:
+                if not os.path.isfile(path):
+                    continue
+                conts = [c for c in merged_conts if c.get("compose_file") == path]
+                name = next((c["project"] for c in conts if c.get("project")), "")
+                name = name or os.path.basename(os.path.dirname(os.path.abspath(path))) or path
+                stacks.setdefault(name, []).extend(conts)
+
+        wanted = {_slug(name): name for name in stacks}
+        for slug in set(self._docker_stacks) - set(wanted):
+            self.publish(self._discovery_topic("sensor", f"docker_stack_{slug}_health"), "", retain=True)
+        for slug, name in wanted.items():
+            if slug not in self._docker_stacks:
+                self._register_docker_stack(name)
+        self._docker_stacks = wanted
+
+        unhealthy = {}
+        for name, conts in stacks.items():
+            problems = []
+            for c in conts:
+                cname = c.get("name") or c.get("service") or "?"
+                state = c.get("status") or c.get("state") or ""
+                if cname in bad:
+                    problems.append(f"{cname}: {', '.join(bad[cname])}")
+                elif state in ("dead", "paused"):
+                    problems.append(f"{cname}: {state}")
+                elif state == "created":
+                    problems.append(f"{cname}: created but not started")
+            running = sum(1 for c in conts if (c.get("status") or c.get("state")) == "running")
+            if problems:
+                health = "unhealthy"
+            elif not running:
+                health = "stopped"
+            elif any(c.get("health") == "starting" for c in conts):
+                health = "starting"
+            else:
+                health = "healthy"
+            unhealthy[name] = health == "unhealthy"
+
+            sbase = f"{base}/stack/{_slug(name)}"
+            self.publish(f"{sbase}/health", health)
+            self.publish(f"{sbase}/health_attributes", json.dumps({
+                "summary": f"{running}/{len(conts)} running",
+                "problems": problems,
+                "containers": [
+                    {
+                        "name": c.get("name"),
+                        "state": c.get("status") or c.get("state"),
+                        "health": c.get("health"),
+                    }
+                    for c in conts
+                ],
+            }))
+
+        self._docker_stack_health = unhealthy
+        self.sync_stack_alerts("docker", unhealthy)
 
     def _remember_docker_image(self, image_ref, compose_file, services):
         slug = _slug(image_ref)
@@ -205,6 +285,7 @@ class DockerMixin:
                         "containers": [{"name": n, "reasons": r} for n, r in bad.items()],
                     }),
                 )
+                self._docker_publish_stacks(merged_conts, bad, base)
             except Exception:
                 pass
 

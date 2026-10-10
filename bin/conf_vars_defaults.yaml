@@ -60,8 +60,6 @@ device:
   # Write logs/crashreport_<timestamp>.log when the agent crashes.
   crash_report: true
   discovery_settle_delay: 2.0
-  # Seconds to wait after a config change from Home Assistant before restarting.
-  config_restart_delay: 30
   self_update_check_interval: 300
   # Install agent updates automatically, without anyone pressing Install.
   auto_update: false
@@ -171,6 +169,12 @@ docker:
   containers_up_sensor_name: "Docker containers up"
   containers_error_sensor_name: "Docker containers with errors"
   image_update_prefix: ""
+  # A select per stack in Home Assistant: what an unhealthy stack raises
+  # (off | warning | error). Not used on a host where TugBoat is active.
+  stack_alerts:
+    enabled: false
+    default: "warning"
+    stacks: {}
   stats:
     enabled: false
     update_interval: 30
@@ -208,11 +212,20 @@ tugboat:
   path: ""
   python_bin: "python3"
   update_interval: 30
+  # A select per stack in Home Assistant: what an unhealthy stack raises
+  # (off | warning | error). The selects fill in "stacks".
+  stack_alerts:
+    enabled: false
+    default: "warning"
+    stacks: {}
 
 # Example:
 # tugboat:
 #   enabled: true
 #   path: "/container-data"
+#   stack_alerts:
+#     enabled: true
+#     default: "error"
 
 #################################
 # Host Update                   #
