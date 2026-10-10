@@ -297,6 +297,10 @@ class TuxDAgentMixin(
             self.handle_tugboat_stack_select(payload)
             return
 
+        if topic == f"{self.base_topic}/tugboat/select_backup/set":
+            self.handle_tugboat_backup_select(payload)
+            return
+
         if topic == f"{self.base_topic}/tugboat/select_action/set":
             self.handle_tugboat_action_select(payload)
             return

@@ -3,7 +3,7 @@ import os
 import threading
 
 from .shared import slugify as _slug
-from modules.tugboat import ACTIONS, read_status, run_command, stack_names
+from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names
 
 
 class TugboatMixin:
@@ -22,6 +22,9 @@ class TugboatMixin:
         self._tugboat_selected_stack = self._tugboat_stack_placeholder
         self._tugboat_selected_action = self._tugboat_action_placeholder
         self._tugboat_running = False
+        self._tugboat_backup_default = self.tr("Newest backup")
+        self._tugboat_selected_backup = self._tugboat_backup_default
+        self._tugboat_backups = []
         self._tugboat_images = {}
 
     def _tugboat_active(self):
@@ -108,6 +111,8 @@ class TugboatMixin:
         }), retain=True)
         self.publish(action_state_topic, self._tugboat_selected_action, retain=True)
 
+        self._register_tugboat_backup_select()
+
         self.publish(self._discovery_topic("button", "tugboat_execute"), json.dumps({
             "name": self.tr("TugBoat Execute"),
             "command_topic": f"{self.base_topic}/tugboat/execute/set",
@@ -117,6 +122,37 @@ class TugboatMixin:
             "entity_category": "config",
             "default_entity_id": f"button.{self.device_slug}_tugboat_execute",
         }), retain=True)
+
+    def _rollback_label(self):
+        return next((label for label, flag in self._tugboat_actions.items() if flag == "--rollback"), "")
+
+    def _register_tugboat_backup_select(self):
+        topic = f"{self.base_topic}/tugboat/select_backup"
+        options = [self._tugboat_backup_default] + self._tugboat_backups
+        if self._tugboat_selected_backup not in options:
+            self._tugboat_selected_backup = self._tugboat_backup_default
+        self.publish(self._discovery_topic("select", "tugboat_select_backup"), json.dumps({
+            "name": self.tr("TugBoat Backup"),
+            "state_topic": topic,
+            "command_topic": f"{topic}/set",
+            "json_attributes_topic": f"{topic}/attributes",
+            "options": options,
+            "unique_id": f"{self.config['device']['name']}_tugboat_select_backup",
+            "device": self.device_info,
+            "icon": "mdi:backup-restore",
+            "entity_category": "config",
+            "default_entity_id": f"select.{self.device_slug}_tugboat_backup",
+        }), retain=True)
+        self.publish(topic, self._tugboat_selected_backup, retain=True)
+        self.publish(f"{topic}/attributes", json.dumps({"for_action": self._rollback_label()}), retain=True)
+
+    def _refresh_tugboat_backups(self, stack):
+        def work():
+            real = stack in self._tugboat_known_stacks
+            self._tugboat_backups = list_backups(self._tugboat_python_bin, self._tugboat_path, stack) if real else []
+            self._tugboat_selected_backup = self._tugboat_backup_default
+            self._register_tugboat_backup_select()
+        threading.Thread(target=work, daemon=True).start()
 
     def _publish_tugboat_status(self, status):
         stacks = status.get("stacks", {})
@@ -179,7 +215,7 @@ class TugboatMixin:
                     entity_category="diagnostic",
                     ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}",
                 )
-            state = self._tugboat_stack_state(name, info["images"])
+            state = self._tugboat_stack_state(name, info["images"], self._tugboat_icon_url(info))
             seen[oid] = (name, f"{topic}/state", state)
             self.publish(f"{topic}/state", json.dumps(state))
 
@@ -188,7 +224,12 @@ class TugboatMixin:
         self._tugboat_images = seen
 
     @staticmethod
-    def _tugboat_stack_state(name, images):
+    def _tugboat_icon_url(info):
+        urls = [info.get("icon_url")] + [i.get("icon_url") for i in info.get("images") or [] if isinstance(i, dict)]
+        return next((u.strip() for u in urls if isinstance(u, str) and u.strip().startswith(("https://", "http://"))), "")
+
+    @staticmethod
+    def _tugboat_stack_state(name, images, icon_url=""):
         lines = []
         for img in images:
             if not isinstance(img, dict) or not img.get("image"):
@@ -222,6 +263,8 @@ class TugboatMixin:
         }
         if lines:
             state["release_summary"] = "\n".join(lines)
+        if icon_url:
+            state["entity_picture"] = icon_url
         return state
 
     def handle_tugboat_image_install(self, topic):
@@ -249,6 +292,14 @@ class TugboatMixin:
             return
         self._tugboat_selected_stack = value
         self.publish(f"{self.base_topic}/tugboat/select_stack", value, retain=True)
+        self._refresh_tugboat_backups(value)
+
+    def handle_tugboat_backup_select(self, payload):
+        value = payload.strip()
+        if value not in [self._tugboat_backup_default] + self._tugboat_backups:
+            return
+        self._tugboat_selected_backup = value
+        self.publish(f"{self.base_topic}/tugboat/select_backup", value, retain=True)
 
     def handle_tugboat_action_select(self, payload):
         value = payload.strip()
@@ -264,21 +315,27 @@ class TugboatMixin:
             return
         if self._tugboat_selected_action == self._tugboat_action_placeholder:
             return
+        extra = ()
+        if self._tugboat_actions.get(self._tugboat_selected_action) == "--rollback":
+            if self._tugboat_selected_stack not in self._tugboat_known_stacks:
+                return
+            if self._tugboat_selected_backup != self._tugboat_backup_default:
+                extra = ("--to", self._tugboat_selected_backup)
         self._tugboat_running = True
         threading.Thread(
             target=self._run_tugboat_action,
-            args=(self._tugboat_selected_stack, self._tugboat_selected_action),
+            args=(self._tugboat_selected_stack, self._tugboat_selected_action, True, extra),
             daemon=True,
         ).start()
 
-    def _run_tugboat_action(self, stack, action, reset_selects=True):
+    def _run_tugboat_action(self, stack, action, reset_selects=True, extra=()):
         flag = self._tugboat_actions.get(action)
         targets = list(self._tugboat_known_stacks) if stack == self._tugboat_all_stacks else [stack]
         try:
             outputs = []
             for target in targets:
                 with self.busy(f"tugboat: {action} {target}"):
-                    outputs.append(run_command(self._tugboat_python_bin, self._tugboat_path, flag, target))
+                    outputs.append(run_command(self._tugboat_python_bin, self._tugboat_path, flag, target, extra=extra))
                     if flag != "--healthcheck":
                         run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", target)
             output = "\n".join(o for o in outputs if o)
@@ -300,6 +357,8 @@ class TugboatMixin:
                 self._tugboat_selected_action = self._tugboat_action_placeholder
                 self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_stack_placeholder, retain=True)
                 self.publish(f"{self.base_topic}/tugboat/select_action", self._tugboat_action_placeholder, retain=True)
+                self._tugboat_backups = []
+                self._register_tugboat_backup_select()
             self._tugboat_running = False
 
     def tugboat_loop(self):
