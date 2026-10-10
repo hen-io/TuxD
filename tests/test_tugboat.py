@@ -34,6 +34,11 @@ class Agent(TugboatMixin):
     def _discovery_topic(self, domain, oid):
         return f"homeassistant/{domain}/box/{oid}/config"
 
+    def _sensor_discovery(self, object_id, name, state_topic, unit=None, ha_object_id=None, **kw):
+        cfg = {"name": name, "state_topic": state_topic, "unit_of_measurement": unit,
+               "default_entity_id": f"sensor.{ha_object_id}", **kw}
+        self.pub[self._discovery_topic("sensor", object_id)] = json.dumps(cfg)
+
     def _run_tugboat_action(self, stack, action, reset_selects=True, extra=()):
         self.runs.append((stack, action, extra))
         self._tugboat_running = False
@@ -110,6 +115,26 @@ class TugboatTest(unittest.TestCase):
         images = [{"image": "r/x:1", "status": "update_available", "local_version": "1", "remote_version": "2", "services": ["x"]}]
         self.assertEqual(TugboatMixin._tugboat_stack_state("web", images, url)["entity_picture"], url)
         self.assertNotIn("entity_picture", TugboatMixin._tugboat_stack_state("web", images))
+
+    def test_since_released_sensor_per_image(self):
+        a = Agent()
+        images = [
+            {"image": "lscr.io/linuxserver/bazarr:latest", "local_release_date": "2026-10-01T10:00:00+02:00", "local_version": "v1"},
+            {"image": "ghcr.io/x/bazarr@sha256:abc", "local_release_date": ""},
+        ]
+        with mock.patch.object(TugboatMixin, "_days_since", staticmethod(lambda iso: 9)):
+            ids = a._publish_tugboat_ages("web", "web", images)
+        self.assertEqual(ids, {"tugboat_released_web_bazarr", "tugboat_released_web_bazarr_2"})
+        cfg = json.loads(a.pub["homeassistant/sensor/box/tugboat_released_web_bazarr/config"])
+        self.assertEqual((cfg["default_entity_id"], cfg["unit_of_measurement"]), ("sensor.box_tugboat_web_bazarr_released", "d"))
+        self.assertEqual(str(a.pub["t/tugboat/released/web/bazarr/state"]), "9")
+        self.assertEqual(a.pub["t/tugboat/released/web/bazarr_2/state"], "unknown")
+        self.assertEqual(json.loads(a.pub["t/tugboat/released/web/bazarr/attributes"])["version"], "v1")
+
+    def test_days_since(self):
+        self.assertIsNone(TugboatMixin._days_since("nope"))
+        self.assertGreaterEqual(TugboatMixin._days_since("2020-01-01T00:00:00Z"), 2000)
+        self.assertEqual(TugboatMixin._days_since("2999-01-01T00:00:00+00:00"), 0)
 
     def test_norwegian_labels(self):
         a = Agent("nb")

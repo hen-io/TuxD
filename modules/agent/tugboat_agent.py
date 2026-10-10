@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+from datetime import datetime, timezone
 
 from .shared import slugify as _slug
 from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names
@@ -26,6 +27,7 @@ class TugboatMixin:
         self._tugboat_selected_backup = self._tugboat_backup_default
         self._tugboat_backups = []
         self._tugboat_images = {}
+        self._tugboat_ages = set()
 
     def _tugboat_active(self):
         if not self._tugboat_enabled or not self._tugboat_path:
@@ -56,6 +58,7 @@ class TugboatMixin:
             self._register_tugboat_stack(name)
         self._register_tugboat_selects()
         self._tugboat_images = {}
+        self._tugboat_ages = set()
         if status:
             self._publish_tugboat_status(status)
 
@@ -199,6 +202,7 @@ class TugboatMixin:
 
     def _publish_tugboat_images(self, stacks):
         seen = {}
+        ages = set()
         for name, info in stacks.items():
             if not isinstance(info, dict) or not isinstance(info.get("images"), list):
                 continue
@@ -218,10 +222,59 @@ class TugboatMixin:
             state = self._tugboat_stack_state(name, info["images"], self._tugboat_icon_url(info))
             seen[oid] = (name, f"{topic}/state", state)
             self.publish(f"{topic}/state", json.dumps(state))
+            ages.update(self._publish_tugboat_ages(name, stack_slug, info["images"]))
 
         for oid in set(self._tugboat_images) - set(seen):
             self.publish(self._discovery_topic("update", oid), "", retain=True)
         self._tugboat_images = seen
+        for oid in self._tugboat_ages - ages:
+            self.publish(self._discovery_topic("sensor", oid), "", retain=True)
+        self._tugboat_ages = ages
+
+    @staticmethod
+    def _days_since(iso):
+        try:
+            when = datetime.fromisoformat(str(iso).strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        return max(0, (datetime.now(timezone.utc) - when).days)
+
+    def _publish_tugboat_ages(self, stack, stack_slug, images):
+        ids, used = set(), set()
+        for img in images:
+            if not isinstance(img, dict) or not img.get("image"):
+                continue
+            ref = str(img["image"]).split("@", 1)[0]
+            short = _slug(ref.rsplit("/", 1)[-1].split(":", 1)[0]) or "image"
+            slug, n = short, 2
+            while slug in used:
+                slug, n = f"{short}_{n}", n + 1
+            used.add(slug)
+            oid = f"tugboat_released_{stack_slug}_{slug}"
+            topic = f"{self.base_topic}/tugboat/released/{stack_slug}/{slug}"
+            if oid not in self._tugboat_ages:
+                self._sensor_discovery(
+                    oid,
+                    f"{short} {self.tr('since released')}",
+                    f"{topic}/state",
+                    unit="d",
+                    icon="mdi:calendar-clock",
+                    attributes_topic=f"{topic}/attributes",
+                    entity_category="diagnostic",
+                    state_class="measurement",
+                    ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}_{slug}_released",
+                )
+            date = img.get("local_release_date") or ""
+            days = self._days_since(date) if date else None
+            self.publish(f"{topic}/state", "unknown" if days is None else days)
+            self.publish(f"{topic}/attributes", json.dumps({
+                "stack": stack, "image": ref, "released": date,
+                "version": img.get("local_version") or "",
+            }))
+            ids.add(oid)
+        return ids
 
     @staticmethod
     def _tugboat_icon_url(info):
