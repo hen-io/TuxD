@@ -160,6 +160,7 @@ class HostUpdateMixin:
             parts.append(self._host_update_install_note(cfg))
             state["release_summary"] = "\n\n".join(parts)
 
+        state["distro"] = self._distro_ids()
         self._host_update_last_state = dict(state)
         self.publish(f"{base}/state", json.dumps(state), retain=True)
         self.publish(f"{base}/package_versions", self._packages_value(pkgs))
@@ -170,6 +171,19 @@ class HostUpdateMixin:
             attrs["latest_kernel_version"] = latest_kernel
         self.publish(f"{base}/state_attributes", json.dumps(attrs), retain=True)
         return True
+
+    @staticmethod
+    def _distro_ids():
+        ids = []
+        try:
+            with open("/etc/os-release", encoding="utf-8") as f:
+                for line in f:
+                    key, _, value = line.strip().partition("=")
+                    if key in ("ID", "ID_LIKE"):
+                        ids += value.strip("\"'").lower().split()
+        except OSError:
+            pass
+        return ids
 
     def handle_host_update_check(self):
         cfg = self.config.get("host_update", {}) or {}
