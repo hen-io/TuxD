@@ -53,10 +53,12 @@ def stack_names(status):
     return sorted(status.get("stacks", {}).keys())
 
 
-def build_command(python_bin, path, action_flag, stack, extra=()):
+def build_command(python_bin, path, action_flag, stack=None, extra=()):
     return (
         f"cd {shlex.quote(path)} && "
-        f"{python_bin} TugBoat.py {action_flag} --stack {shlex.quote(stack)} --auto"
+        f"{python_bin} TugBoat.py {action_flag}"
+        + (f" --stack {shlex.quote(stack)}" if stack else "")
+        + " --auto"
         + "".join(f" {shlex.quote(a)}" for a in extra)
     )
 

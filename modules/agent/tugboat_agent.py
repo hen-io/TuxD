@@ -89,10 +89,18 @@ class TugboatMixin:
             options.append(self._tugboat_all_stacks)
         return options + self._tugboat_known_stacks
 
+    def _tugboat_default_stack(self):
+        if len(self._tugboat_known_stacks) == 1:
+            return self._tugboat_known_stacks[0]
+        return self._tugboat_stack_placeholder
+
     def _register_tugboat_selects(self):
         stack_options = self._tugboat_stack_options()
-        if self._tugboat_selected_stack not in stack_options:
-            self._tugboat_selected_stack = self._tugboat_stack_placeholder
+        if self._tugboat_selected_stack not in stack_options or self._tugboat_selected_stack == self._tugboat_stack_placeholder:
+            default = self._tugboat_default_stack()
+            if default != self._tugboat_selected_stack:
+                self._tugboat_selected_stack = default
+                self._refresh_tugboat_backups(default)
         stack_state_topic = f"{self.base_topic}/tugboat/select_stack"
         self.publish(self._discovery_topic("select", "tugboat_select_stack"), json.dumps({
             "name": self.tr("TugBoat Stack"),
@@ -439,9 +447,9 @@ class TugboatMixin:
                     self.publish(state_topic, json.dumps(state))
         finally:
             if reset_selects:
-                self._tugboat_selected_stack = self._tugboat_stack_placeholder
+                self._tugboat_selected_stack = self._tugboat_default_stack()
                 self._tugboat_selected_action = self._tugboat_action_placeholder
-                self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_stack_placeholder, retain=True)
+                self.publish(f"{self.base_topic}/tugboat/select_stack", self._tugboat_selected_stack, retain=True)
                 self.publish(f"{self.base_topic}/tugboat/select_action", self._tugboat_action_placeholder, retain=True)
                 self._tugboat_backups = []
                 self._register_tugboat_backup_select()
