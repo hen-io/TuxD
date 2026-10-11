@@ -39,6 +39,9 @@ class Agent(TugboatMixin):
                "default_entity_id": f"sensor.{ha_object_id}", **kw}
         self.pub[self._discovery_topic("sensor", object_id)] = json.dumps(cfg)
 
+    def _update_discovery(self, object_id, name, state_topic, ha_object_id=None, **kw):
+        self.pub[self._discovery_topic("update", object_id)] = json.dumps({"default_entity_id": f"update.{ha_object_id}"})
+
     def _run_tugboat_action(self, stack, action, reset_selects=True, extra=()):
         self.runs.append((stack, action, extra))
         self._tugboat_running = False
@@ -141,6 +144,15 @@ class TugboatTest(unittest.TestCase):
         self.assertFalse(json.loads(a.pub["t/tugboat/version_attributes"])["update_available"])
         a._publish_tugboat_version({})
         self.assertEqual(a.pub["t/tugboat/version"], "unknown")
+
+    def test_every_entity_id_has_tugboat_after_the_host(self):
+        a = Agent()
+        a._register_tugboat_stack("node-red")
+        a._register_tugboat_selects()
+        a._publish_tugboat_images({"node-red": {"images": [{"image": "nodered/node-red:latest"}]}})
+        ids = [json.loads(v)["default_entity_id"] for k, v in a.pub.items() if k.endswith("/config")]
+        self.assertIn("sensor.box_tugboat_node_red_health", ids)
+        self.assertTrue(ids and all(i.split(".", 1)[1].startswith("box_tugboat_") for i in ids), ids)
 
     def test_days_since(self):
         self.assertIsNone(TugboatMixin._days_since("nope"))

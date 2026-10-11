@@ -80,6 +80,7 @@ class TugboatMixin:
             icon="mdi:ferry",
             attributes_topic=f"{self.base_topic}/tugboat/{slug}/health_attributes",
             entity_category="diagnostic",
+            ha_object_id=f"{self.device_slug}_tugboat_{slug}_health",
         )
 
     def _tugboat_stack_options(self):
