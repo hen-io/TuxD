@@ -1,7 +1,7 @@
 import time
 import datetime
 import threading
-from .shared import run_cmd
+from .shared import SENSOR_CMD_TIMEOUT, run_cmd
 
 
 _POWER_BUTTONS = {
@@ -59,7 +59,7 @@ class CustomEntitiesMixin:
 
                 nr = next_run.get(slug, 0)
                 if now >= nr:
-                    output = run_cmd(cmd)
+                    output = run_cmd(cmd, timeout=SENSOR_CMD_TIMEOUT)
                     topic = f"{self.base_topic}/custom_sensor/{slug}"
                     self.publish(topic, output)
                     next_run[slug] = now + interval

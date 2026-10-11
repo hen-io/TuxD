@@ -27,7 +27,10 @@ def entity_object_id(object_id):
     )
 
 
-def run_cmd(cmd: str, env=None):
+SENSOR_CMD_TIMEOUT = 60
+
+
+def run_cmd(cmd: str, env=None, timeout=None):
     if not cmd or cmd.strip() == "":
         return ""
     try:
@@ -36,8 +39,11 @@ def run_cmd(cmd: str, env=None):
             shell=True,
             capture_output=True,
             text=True,
-            env=env
+            env=env,
+            timeout=timeout,
         )
         return result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        return f"ERR: timed out after {timeout}s"
     except Exception as e:
         return f"ERR: {e}"

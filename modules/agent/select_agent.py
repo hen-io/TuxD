@@ -1,7 +1,7 @@
 import json
 import datetime
 import threading
-from .shared import entity_object_id, run_cmd
+from .shared import SENSOR_CMD_TIMEOUT, entity_object_id, run_cmd
 
 
 class SelectMixin:
@@ -46,7 +46,7 @@ class SelectMixin:
 
             get_state_cmd = (s.get("get_state_cmd") or "").strip()
             if get_state_cmd:
-                raw = run_cmd(get_state_cmd).strip()
+                raw = run_cmd(get_state_cmd, timeout=SENSOR_CMD_TIMEOUT).strip()
                 state = self._select_match_state(s, raw)
 
             if not state:

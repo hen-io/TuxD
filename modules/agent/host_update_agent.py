@@ -2,7 +2,7 @@ import json
 import threading
 import time
 
-from .shared import run_cmd
+from .shared import SENSOR_CMD_TIMEOUT, run_cmd
 from modules.host_update import update_count, update_list, default_install_cmd, parse_leading_int
 
 
@@ -116,7 +116,7 @@ class HostUpdateMixin:
         return counter() if callable(counter) else 0
 
     def _kernel_version(self):
-        return run_cmd("uname -r").strip()
+        return run_cmd("uname -r", timeout=SENSOR_CMD_TIMEOUT).strip()
 
     def _latest_kernel_from_pkgs(self, pkgs):
         for p in pkgs:

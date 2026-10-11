@@ -13,6 +13,8 @@ except ImportError:
     websockets = None
 
 
+_MAX_TEXT = 4000
+
 class _FakeMqttClient:
     def __init__(self, backend):
         self._backend = backend
@@ -299,6 +301,8 @@ class HADirectBase:
             payload = str(payload)
 
         is_discovery = topic.startswith("homeassistant/") and topic.endswith("/config")
+        if not is_discovery and len(payload) > _MAX_TEXT and not payload.lstrip().startswith(("{", "[")):
+            payload = payload[:_MAX_TEXT] + " …"
         if retain and is_discovery:
             self._known_discovery_topics.add(topic)
 

@@ -1,6 +1,6 @@
 import json
 import time
-from .shared import run_cmd
+from .shared import SENSOR_CMD_TIMEOUT, run_cmd
 
 _DEFAULT_SUFFIXES = {
     "updates_available": " new updates",
@@ -68,7 +68,7 @@ class StatusCommandsMixin:
         for var, val in self._status_env.items():
             expanded = expanded.replace(f"${var}", val)
 
-        output = run_cmd(expanded)
+        output = run_cmd(expanded, timeout=SENSOR_CMD_TIMEOUT)
 
         lines = output.split("\n")
         value = lines[0] if lines else ""

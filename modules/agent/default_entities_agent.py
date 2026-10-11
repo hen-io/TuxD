@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from .shared import run_cmd
+from .shared import SENSOR_CMD_TIMEOUT, run_cmd
 
 _BIN = Path(__file__).resolve().parent.parent.parent / "bin"
 
@@ -59,7 +59,7 @@ class DefaultEntitiesMixin:
                 if not cmd:
                     continue
 
-                output = run_cmd(cmd)
+                output = run_cmd(cmd, timeout=SENSOR_CMD_TIMEOUT)
                 lines = output.split("\n")
                 value = lines[0] if lines else ""
                 suffix = s.get("suffix", "")

@@ -167,6 +167,11 @@ class TugboatMixin:
             self._register_tugboat_backup_select()
         threading.Thread(target=work, daemon=True).start()
 
+    def _tugboat_publish(self, topic, payload):
+        payload = str(payload)
+        if getattr(self, "state_cache", {}).get(topic) != payload:
+            self.publish(topic, payload)
+
     def _publish_tugboat_status(self, status):
         stacks = status.get("stacks", {})
         new_names = sorted(stacks.keys())
@@ -182,8 +187,8 @@ class TugboatMixin:
                 continue
             slug = _slug(name)
             base = f"{self.base_topic}/tugboat/{slug}"
-            self.publish(f"{base}/health", str(info.get("health") or "unknown"))
-            self.publish(f"{base}/health_attributes", json.dumps({
+            self._tugboat_publish(f"{base}/health", str(info.get("health") or "unknown"))
+            self._tugboat_publish(f"{base}/health_attributes", json.dumps({
                 "summary": info.get("summary", ""),
                 "problems": info.get("problems", []),
                 "checked_at": info.get("checked_at", ""),
@@ -216,8 +221,8 @@ class TugboatMixin:
         version = str(status.get("tugboat_version") or "").strip()
         check = status.get("release_check") if isinstance(status.get("release_check"), dict) else {}
         latest = str(check.get("latest") or "").strip()
-        self.publish(f"{self.base_topic}/tugboat/version", version or "unknown")
-        self.publish(f"{self.base_topic}/tugboat/version_attributes", json.dumps({
+        self._tugboat_publish(f"{self.base_topic}/tugboat/version", version or "unknown")
+        self._tugboat_publish(f"{self.base_topic}/tugboat/version_attributes", json.dumps({
             "latest_version": latest,
             "update_available": bool(version and latest and latest != version
                                      and self._version_key(latest) > self._version_key(version)),
@@ -249,7 +254,7 @@ class TugboatMixin:
                 )
             state = self._tugboat_stack_state(name, info["images"], self._tugboat_icon_url(info))
             seen[oid] = (name, f"{topic}/state", state)
-            self.publish(f"{topic}/state", json.dumps(state))
+            self._tugboat_publish(f"{topic}/state", json.dumps(state))
             ages.update(self._publish_tugboat_ages(name, stack_slug, info["images"]))
 
         for oid in set(self._tugboat_images) - set(seen):
@@ -296,8 +301,8 @@ class TugboatMixin:
                 )
             date = img.get("local_release_date") or ""
             days = self._days_since(date) if date else None
-            self.publish(f"{topic}/state", "unknown" if days is None else days)
-            self.publish(f"{topic}/attributes", json.dumps({
+            self._tugboat_publish(f"{topic}/state", "None" if days is None else days)
+            self._tugboat_publish(f"{topic}/attributes", json.dumps({
                 "stack": stack, "image": ref, "released": date,
                 "version": img.get("local_version") or "",
             }))
