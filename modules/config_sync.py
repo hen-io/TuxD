@@ -11,20 +11,56 @@ def _compute_samples_hash(section_samples: dict) -> str:
     return hashlib.md5(payload.encode()).hexdigest()
 
 
-def _read_samples_hash(config_path: str) -> str:
-    meta = Path(config_path).with_suffix('.ksync')
+def _read_meta(config_path: str) -> dict:
     try:
-        return json.loads(meta.read_text(encoding='utf-8')).get('samples_hash', '')
+        data = json.loads(Path(config_path).with_suffix('.ksync').read_text(encoding='utf-8'))
+        return data if isinstance(data, dict) else {}
     except Exception:
-        return ''
+        return {}
+
+
+def _write_meta(config_path: str, **values):
+    data = _read_meta(config_path)
+    data.update(values)
+    try:
+        Path(config_path).with_suffix('.ksync').write_text(json.dumps(data), encoding='utf-8')
+    except Exception:
+        pass
+
+
+def _read_samples_hash(config_path: str) -> str:
+    return _read_meta(config_path).get('samples_hash', '')
 
 
 def _write_samples_hash(config_path: str, hash_val: str):
-    meta = Path(config_path).with_suffix('.ksync')
-    try:
-        meta.write_text(json.dumps({'samples_hash': hash_val}), encoding='utf-8')
-    except Exception:
-        pass
+    _write_meta(config_path, samples_hash=hash_val)
+
+
+_REWRITES = [
+    ("2026-10-11-tugboat-defaults", [
+        (("tugboat", "update_interval"), 10),
+        (("tugboat", "stack_alerts", "enabled"), True),
+        (("docker", "stack_alerts", "enabled"), True),
+    ]),
+]
+
+
+def _apply_rewrites(config: dict, config_path: str) -> bool:
+    done = set(_read_meta(config_path).get('rewrites') or [])
+    changed = False
+    for rid, values in _REWRITES:
+        if rid in done:
+            continue
+        for path, value in values:
+            node = config
+            for key in path[:-1]:
+                node = node.get(key) if isinstance(node, dict) else None
+            if isinstance(node, dict) and node.get(path[-1]) != value:
+                node[path[-1]] = value
+                changed = True
+        done.add(rid)
+    _write_meta(config_path, rewrites=sorted(done))
+    return changed
 
 
 def _make_separator(title: str) -> str:
@@ -314,6 +350,8 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     if _migrate_update_buttons(config):
         migration_changed = True
     if _migrate_power_buttons(config):
+        migration_changed = True
+    if _apply_rewrites(config, config_path):
         migration_changed = True
     item_defaults_changed = _apply_item_defaults(config, item_defaults)
 

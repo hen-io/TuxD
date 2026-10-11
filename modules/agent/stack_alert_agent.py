@@ -38,9 +38,8 @@ class StackAlertMixin:
         self._stack_alert_selects.pop(source, None)
 
     def sync_stack_alerts(self, source, stacks):
-        if not self._stack_alert_cfg(source).get("enabled", False):
-            stacks = {}
-        wanted = {_slug(name): name for name in stacks}
+        selects = bool(self._stack_alert_cfg(source).get("enabled", True))
+        wanted = {_slug(name): name for name in stacks} if selects else {}
         known = self._stack_alert_selects.get(source, {})
         for slug in set(known) - set(wanted):
             self.publish(self._discovery_topic("select", f"cfgselect_{source}_{slug}_alert"), "", retain=True)

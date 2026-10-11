@@ -169,10 +169,11 @@ docker:
   containers_up_sensor_name: "Docker containers up"
   containers_error_sensor_name: "Docker containers with errors"
   image_update_prefix: ""
-  # A select per stack in Home Assistant: what an unhealthy stack raises
-  # (off | warning | error). Not used on a host where TugBoat is active.
+  # An unhealthy stack raises the host's warning (default: off | warning |
+  # error). enabled adds a select per stack to change it from Home
+  # Assistant. Not used on a host where TugBoat is active.
   stack_alerts:
-    enabled: false
+    enabled: true
     default: "warning"
     stacks: {}
   stats:
@@ -211,11 +212,12 @@ tugboat:
   enabled: false
   path: ""
   python_bin: "python3"
-  update_interval: 30
-  # A select per stack in Home Assistant: what an unhealthy stack raises
-  # (off | warning | error). The selects fill in "stacks".
+  update_interval: 10
+  # An unhealthy stack raises the host's warning (default: off | warning |
+  # error). enabled adds a select per stack to change it from Home
+  # Assistant; the selects fill in "stacks".
   stack_alerts:
-    enabled: false
+    enabled: true
     default: "warning"
     stacks: {}
 
