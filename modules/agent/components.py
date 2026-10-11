@@ -34,6 +34,9 @@ class ComponentSensorsMixin:
             host_cpu_cfg = cfg.get("cpu_load", {}).get("host_cpu_load", {})
             if host_cpu_cfg.get("enabled", False):
                 host_name = host_cpu_cfg.get("name") or "Host CPU Load"
+                agent_name = str(self.config["device"]["name"])
+                if not host_name.lower().startswith(agent_name.lower() + " "):
+                    host_name = f"{agent_name} {host_name}"
                 attrs_topic = f"{self.base_topic}/host_cpu_load_attrs"
                 self._sensor_discovery(
                     "host_cpu_load",
