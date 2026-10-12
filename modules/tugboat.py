@@ -15,16 +15,20 @@ ACTIONS = {
     "Health Check": "--healthcheck",
 }
 
-DEFAULT_STATUS_FILES = ("TugBoat/tugboat.json", "tugboat.json")
+DEFAULT_STATUS_FILES = (".TugBoat/tugboat.json", "TugBoat/tugboat.json", "tugboat.json")
+CONF_FILES = (".TugBoat/TugBoat.conf", "TugBoat/TugBoat.conf", "TugBoat.conf")
 
 
 def read_tugboat_conf(path):
-    conf_path = os.path.join(path, "TugBoat.conf")
-    try:
-        with open(conf_path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    except Exception:
-        return {}
+    for name in CONF_FILES:
+        try:
+            with open(os.path.join(path, name), "r", encoding="utf-8") as f:
+                return yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            continue
+        except Exception:
+            return {}
+    return {}
 
 
 def status_file_path(path, conf=None):
