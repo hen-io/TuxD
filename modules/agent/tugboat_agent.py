@@ -185,9 +185,14 @@ class TugboatMixin:
         new_names = sorted(stacks.keys())
         if new_names != self._tugboat_known_stacks:
             added = [n for n in new_names if n not in self._tugboat_known_stacks]
+            removed = [n for n in self._tugboat_known_stacks if n not in new_names]
             self._tugboat_known_stacks = new_names
             for name in added:
                 self._register_tugboat_stack(name)
+            for name in removed:
+                slug = _slug(name)
+                self.publish(self._discovery_topic("sensor", f"tugboat_{slug}_health"), "", retain=True)
+                self._forget_tugboat_states(f"{self.base_topic}/tugboat/{slug}/")
             self._register_tugboat_selects()
 
         for name, info in stacks.items():
@@ -267,10 +272,26 @@ class TugboatMixin:
 
         for oid in set(self._tugboat_images) - set(seen):
             self.publish(self._discovery_topic("update", oid), "", retain=True)
+            self._forget_tugboat_states(f"{self.base_topic}/tugboat/image/{oid[len('tugboat_stack_'):]}/")
         self._tugboat_images = seen
-        for oid in self._tugboat_ages - ages:
+        gone = self._tugboat_ages - ages
+        for oid in gone:
             self.publish(self._discovery_topic("sensor", oid), "", retain=True)
+        if gone:
+            released = f"{self.base_topic}/tugboat/released/"
+            cache = getattr(self, "state_cache", {})
+            for topic in [t for t in cache if t.startswith(released)]:
+                parts = topic[len(released):].split("/")
+                if len(parts) == 3 and f"tugboat_released_{parts[0]}_{parts[1]}" in gone:
+                    cache.pop(topic, None)
         self._tugboat_ages = ages
+
+    def _forget_tugboat_states(self, prefix):
+        cache = getattr(self, "state_cache", None)
+        if cache is None:
+            return
+        for topic in [t for t in cache if t.startswith(prefix)]:
+            cache.pop(topic, None)
 
     @staticmethod
     def _days_since(iso):
