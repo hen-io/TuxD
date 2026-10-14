@@ -1,4 +1,5 @@
 import json
+import os
 import shlex
 import threading
 import time
@@ -209,6 +210,8 @@ class HostUpdateMixin:
                         ids += value.strip("\"'").lower().split()
         except OSError:
             pass
+        if os.path.exists("/usr/bin/pveversion") or os.path.isdir("/etc/pve"):
+            ids.insert(0, "proxmox")
         return ids
 
     def handle_host_update_check(self):
