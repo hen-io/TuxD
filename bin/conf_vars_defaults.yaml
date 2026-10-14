@@ -256,6 +256,9 @@ host_update:
   install_button_name: "Update and reboot if needed"
   use_custom_install_cmd: false
   allow_install: true
+  # Seconds an install or update button may run before it is stopped (a
+  # held package lock, a question nobody answers). 0 = no limit.
+  install_timeout: 3600
   device_class: ""
 
 # Example, with custom count, list and install commands:

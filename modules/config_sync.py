@@ -341,6 +341,7 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     sample_markers = {key: sample.splitlines()[0] for key, sample in section_samples.items()}
 
     original_text = config_file.read_text(encoding='utf-8') if config_file.exists() else ''
+    _make_private(config_file)
     try:
         config = yaml.safe_load(original_text) or {}
     except yaml.YAMLError:
@@ -393,7 +394,16 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     body = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
     body = _inject_separators_and_samples(body, set(config.keys()), section_labels, section_samples)
     config_file.write_text(header + body, encoding='utf-8')
+    _make_private(config_file)
     _write_samples_hash(config_path, current_hash)
     return True
+
+
+def _make_private(config_file):
+    try:
+        if config_file.exists() and config_file.stat().st_mode & 0o077:
+            config_file.chmod(0o600)
+    except OSError:
+        pass
 
 

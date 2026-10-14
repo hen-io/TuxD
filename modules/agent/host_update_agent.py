@@ -258,6 +258,13 @@ class HostUpdateMixin:
                     return cmd
         return None
 
+    def _install_timeout(self):
+        try:
+            seconds = float((self.config.get("host_update", {}) or {}).get("install_timeout", 3600))
+        except (TypeError, ValueError):
+            return None
+        return seconds if seconds > 0 else None
+
     def _host_update_install_plan(self, cfg):
         if cfg.get("use_custom_install_cmd", False):
             if cfg.get("install_cmd"):
@@ -290,7 +297,7 @@ class HostUpdateMixin:
                 self.set_warning(True, f'"{name}" button triggered a reboot/shutdown')
             self._set_host_update_progress(True)
             with self.busy(f"button: {name}"):
-                out = self.run_to_terminal(cmd, f'Button "{name}" pressed!')
+                out = self.run_to_terminal(cmd, f'Button "{name}" pressed!', timeout=self._install_timeout())
         except Exception:
             pass
         finally:
@@ -336,7 +343,7 @@ class HostUpdateMixin:
             pass
         try:
             with self.busy("host update"):
-                self.run_to_terminal(cmd, "Installing host updates")
+                self.run_to_terminal(cmd, "Installing host updates", timeout=self._install_timeout())
         except Exception:
             pass
 

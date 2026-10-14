@@ -32,6 +32,7 @@ _EVT_HDR_SIZE = struct.calcsize(_EVT_HDR_FMT)
 _1H  = 3600
 _15M = 900
 _JSON_DB = "database.json"
+_TAIL_BYTES = 256 * 1024
 
 
 def _midnight_ts():
@@ -46,8 +47,11 @@ def _read_last_line(path, log_type="json"):
             size = f.tell()
             if size == 0:
                 return None, "file is empty"
-            f.seek(0)
+            start = max(0, size - _TAIL_BYTES)
+            f.seek(start)
             full_data = f.read()
+            if start:
+                full_data = full_data.split(b"\n", 1)[-1]
 
         text = full_data.decode("utf-8", errors="replace")
 
@@ -60,6 +64,9 @@ def _read_last_line(path, log_type="json"):
                     return json.loads(line), None
                 except json.JSONDecodeError:
                     continue
+            if start and size <= 8 * 1024 * 1024:
+                with open(path, "rb") as f:
+                    text = f.read().decode("utf-8", errors="replace")
             try:
                 return json.loads(text), None
             except json.JSONDecodeError as e:
