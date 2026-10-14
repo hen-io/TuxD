@@ -67,8 +67,10 @@ device:
   # stable | rc | beta - which releases count as an available agent update.
   self_update_release_channel: "stable"
   extra_config_path: ""
-  # Password for opening a live terminal session. Empty = none.
-  password: ""
+  # Password for the terminals and the config editor, as a hash - set it
+  # from Home Assistant (TuxD integration, Configure, Set agent password).
+  # Empty = none. A password typed here in clear text is hashed at start.
+  password_hash: ""
   # mdi icon TuxD-Cards shows for this agent.
   agent_icon: "mdi:server"
   # Commands for the built-in "Reboot" and "Shutdown" buttons.

@@ -88,7 +88,11 @@ class TerminalMixin:
             except Exception:
                 self._terminal_username = "user"
 
-        if self._terminal_input_enabled():
+        device = self.config.get("device", {}) or {}
+        protected = bool(device.get("password_hash") or device.get("password"))
+        entity_wanted = self._terminal_input_enabled() and not callable(getattr(self, "_send_wait", None)) and not protected
+        self._terminal_entity = entity_wanted
+        if entity_wanted:
             self._text_discovery(
                 object_id="terminal_input",
                 name="Terminal Input",

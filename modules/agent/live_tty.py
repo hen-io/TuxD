@@ -23,11 +23,11 @@ class LiveTtyMixin:
             self.publish_tty_exit(session_id, -1)
             return
 
-        required_password = self.config.get("device", {}).get("password") or ""
-        if required_password and not secrets.compare_digest(str(password or ""), required_password):
+        denied = self.password_check(password)
+        if denied:
             self.publish_tty_exit(
                 session_id, -2,
-                reason="Incorrect password" if password else "Password required"
+                reason="Incorrect password" if denied == "incorrect" else "Password required"
             )
             return
 

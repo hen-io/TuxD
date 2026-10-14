@@ -1,21 +1,64 @@
 import os
 import json
+import secrets
 import tempfile
 import yaml
 import time
 import datetime
+
+from modules.password import is_password_hash, verify_password
 
 
 _CONFIG_FILE = "tuxd.conf"
 
 
 class ConfigAgentMixin:
+    _REQUEST_ACTIONS = ("get", "set", "set_password", "terminal", "terminal_stop")
+
+    def password_check(self, given):
+        device = self.config.get("device", {}) or {}
+        stored = str(device.get("password_hash") or "")
+        plain = str(device.get("password") or "")
+        if not stored and not plain:
+            return None
+        if not given:
+            return "required"
+        ok = verify_password(given, stored) if stored else secrets.compare_digest(str(given), plain)
+        if ok:
+            return None
+        time.sleep(1.0)
+        return "incorrect"
+
     def handle_config_request(self, payload):
         try:
             request = json.loads(payload or "{}")
             request_id = str(request.get("request_id") or "")
             action = request.get("action")
-            if not request_id or action not in ("get", "set"):
+            if not request_id or action not in self._REQUEST_ACTIONS:
+                return
+
+            denied = self.password_check(request.get("password"))
+            if denied:
+                self._send_config_response(
+                    request_id, False, auth=denied,
+                    error="Incorrect password" if denied == "incorrect" else "Password required",
+                )
+                return
+
+            if action == "set_password":
+                self._set_password_hash(str(request.get("content") or ""))
+                self._send_config_response(request_id, True)
+                return
+
+            if action in ("terminal", "terminal_stop"):
+                if not self._terminal_input_enabled():
+                    self._send_config_response(request_id, False, error="Terminal input is disabled on this device")
+                    return
+                if action == "terminal_stop":
+                    self.handle_terminal_stop_message()
+                else:
+                    self.handle_terminal_message(str(request.get("content") or ""))
+                self._send_config_response(request_id, True)
                 return
 
             if action == "get":
@@ -52,7 +95,22 @@ class ConfigAgentMixin:
                 pass
             self._send_config_response(request_id, False, error=str(e))
 
-    def _send_config_response(self, request_id, ok, content=None, error=None):
+    def _set_password_hash(self, password_hash):
+        if password_hash and not is_password_hash(password_hash):
+            raise ValueError("Not a password hash")
+        with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+            cfg = yaml.safe_load(f) or {}
+        device = cfg.setdefault("device", {})
+        device.pop("password", None)
+        device["password_hash"] = password_hash
+        with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
+            yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
+        live = self.config.setdefault("device", {})
+        live.pop("password", None)
+        live["password_hash"] = password_hash
+
+    def _send_config_response(self, request_id, ok, content=None, error=None, auth=None):
         sender = getattr(self, "_send_wait", None)
         if not callable(sender):
             return
@@ -61,6 +119,8 @@ class ConfigAgentMixin:
             message["content"] = content
         if error:
             message["error"] = error[:500]
+        if auth:
+            message["auth"] = auth
         sender(message, timeout=5.0)
 
     def _config_restart(self):

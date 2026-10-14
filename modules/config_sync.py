@@ -174,6 +174,17 @@ def _migrate_update_buttons(config: dict) -> bool:
     return changed
 
 
+def _migrate_password(config: dict) -> bool:
+    device = config.get('device')
+    if not isinstance(device, dict) or 'password' not in device:
+        return False
+    plain = device.pop('password')
+    if plain and not device.get('password_hash'):
+        from modules.password import hash_password
+        device['password_hash'] = hash_password(str(plain))
+    return True
+
+
 def _migrate_power_buttons(config: dict) -> bool:
     buttons = config.get('button')
     device = config.get('device')
@@ -355,6 +366,8 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     if _migrate_update_buttons(config):
         migration_changed = True
     if _migrate_power_buttons(config):
+        migration_changed = True
+    if _migrate_password(config):
         migration_changed = True
     if _apply_rewrites(config, config_path):
         migration_changed = True

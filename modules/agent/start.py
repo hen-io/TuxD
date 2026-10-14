@@ -248,12 +248,12 @@ class TuxDAgentMixin(
         payload = msg.payload.decode()
 
         if topic == f"{self.base_topic}/terminal_input/set":
-            if self._terminal_input_enabled():
+            if self._terminal_input_enabled() and getattr(self, "_terminal_entity", False):
                 self.handle_terminal_message(payload)
             return
 
         if topic == f"{self.base_topic}/terminal_stop/set":
-            if self._terminal_input_enabled():
+            if self._terminal_input_enabled() and getattr(self, "_terminal_entity", False):
                 self.handle_terminal_stop_message()
             return
 
@@ -285,7 +285,7 @@ class TuxDAgentMixin(
             self.handle_stack_alert_select(topic, payload)
             return
 
-        if topic == f"{self.base_topic}/config/get" or topic == f"{self.base_topic}/config/set":
+        if topic.startswith(f"{self.base_topic}/config/"):
             self.handle_config_request(payload)
             return
 
