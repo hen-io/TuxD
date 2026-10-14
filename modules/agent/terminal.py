@@ -1,4 +1,5 @@
 import getpass
+import json
 import os
 import select
 import signal
@@ -115,9 +116,18 @@ class TerminalMixin:
                 object_id="terminal_output",
                 name="Terminal Output",
                 state_topic=self.terminal_output_topic,
-                icon="mdi:console"
+                icon="mdi:console",
+                attributes_topic=f"{self.terminal_output_topic}/attributes",
             )
             self.publish(self.terminal_output_topic, "")
+            self.publish_terminal_lock()
+
+    def publish_terminal_lock(self):
+        if not self._terminal_output_enabled():
+            return
+        device = self.config.get("device", {}) or {}
+        locked = bool(device.get("password_hash") or device.get("password"))
+        self.publish(f"{self.terminal_output_topic}/attributes", json.dumps({"password_required": locked}))
 
     def _terminal_prompt(self, cmd):
         return f"{self._terminal_username}:~$ {cmd}"

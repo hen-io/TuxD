@@ -109,6 +109,10 @@ class ConfigAgentMixin:
         live = self.config.setdefault("device", {})
         live.pop("password", None)
         live["password_hash"] = password_hash
+        try:
+            self.publish_terminal_lock()
+        except Exception:
+            pass
 
     def _send_config_response(self, request_id, ok, content=None, error=None, auth=None):
         sender = getattr(self, "_send_wait", None)
