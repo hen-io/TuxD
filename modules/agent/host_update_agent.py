@@ -1,15 +1,29 @@
 import json
+import shlex
 import threading
 import time
+from pathlib import Path
 
 from .shared import SENSOR_CMD_TIMEOUT, run_cmd
 from modules.host_update import update_count, update_list, default_install_cmd, parse_leading_int
+
+_DEBIAN_UPDATE_SCRIPT = Path(__file__).resolve().parents[2] / "bin" / "etc" / "debian_update.sh"
 
 
 _STANDARD_BUTTONS = {
     "update": ("Update", "update_cmd", "mdi:package-up"),
     "update_and_reboot": ("Update and reboot", "update_reboot_cmd", "mdi:restart-alert"),
+    "update_and_reboot_if_needed": ("Update and reboot if needed", "update_reboot_if_needed_cmd", "mdi:restart"),
 }
+
+DEFAULT_INSTALL_BUTTON = "Update and reboot if needed"
+
+_REBOOT_IF_NEEDED = (
+    "if [ -f /var/run/reboot-required ] || "
+    "{ command -v needs-restarting >/dev/null 2>&1 && ! needs-restarting -r >/dev/null 2>&1; }; "
+    "then echo 'Reboot needed - rebooting in 1 minute'; sudo shutdown -r +1; "
+    "else echo 'No reboot needed'; fi"
+)
 
 _BUTTON_ALIASES = {"update_&_reboot": "update_and_reboot"}
 
@@ -35,7 +49,19 @@ class HostUpdateMixin:
                 kept.append(b)
         self.custom_buttons = kept
 
-        defaults = {"update": default_install_cmd(), "update_and_reboot": f"{default_install_cmd()} && sudo reboot"}
+        install = default_install_cmd()
+        defaults = {
+            "update": install,
+            "update_and_reboot": f"{install} && sudo reboot",
+            "update_and_reboot_if_needed": f"{install} && {{ {_REBOOT_IF_NEEDED}; }}",
+        }
+        if "debian" in self._distro_ids():
+            script = shlex.quote(str(_DEBIAN_UPDATE_SCRIPT))
+            defaults = {
+                "update": f"bash {script} --no-reboot",
+                "update_and_reboot": f"bash {script} --always-reboot",
+                "update_and_reboot_if_needed": f"bash {script}",
+            }
         for slug, (_name, key, _icon) in _STANDARD_BUTTONS.items():
             self._host_update_button_cmds[slug] = cfg.get(key) or legacy.get(slug) or defaults[slug]
 
@@ -218,7 +244,7 @@ class HostUpdateMixin:
         return ", ".join(out) + " ..."
 
     def _host_update_button_cmd(self, cfg):
-        name = str(cfg.get("install_button_name") or "Update and reboot").strip().lower()
+        name = str(cfg.get("install_button_name") or DEFAULT_INSTALL_BUTTON).strip().lower()
         if not name:
             return None
         slug = name.replace(" ", "_")
@@ -239,7 +265,7 @@ class HostUpdateMixin:
         else:
             cmd = self._host_update_button_cmd(cfg)
             if cmd:
-                name = str(cfg.get("install_button_name") or "Update and reboot").strip()
+                name = str(cfg.get("install_button_name") or DEFAULT_INSTALL_BUTTON).strip()
                 return cmd, f'{self.tr("button")} "{name}"'
         return default_install_cmd(), self.tr("default for this system")
 
@@ -258,6 +284,7 @@ class HostUpdateMixin:
 
     def _run_host_update_button(self, slug, cmd):
         name = _STANDARD_BUTTONS[slug][0]
+        out = ""
         try:
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: Button "{name}" pressed! > {cmd}')
@@ -284,11 +311,13 @@ class HostUpdateMixin:
                 self._set_host_update_progress(False)
         except Exception:
             self._set_host_update_progress(False)
-        if slug == "update_and_reboot":
-            try:
+        try:
+            if "rebooting in 1 minute" in (out or ""):
+                self.set_warning(True, f'"{name}": rebooting after the updates')
+            elif slug == "update_and_reboot":
                 self.set_warning(False)
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     def handle_host_update_install(self):
         cfg = self.config.get("host_update", {}) or {}

@@ -56,6 +56,7 @@ _NB = {
     "TuxD Agent Update": "TuxD-agentoppdatering",
     "Check for TuxD Agent Updates": "Se etter TuxD-agentoppdateringer",
     "Update and reboot": "Oppdater og start på nytt",
+    "Update and reboot if needed": "Oppdater og start på nytt ved behov",
     "Restart TuxD": "Start TuxD på nytt",
     "Reboot": "Start på nytt",
     "Shutdown": "Slå av",

@@ -42,6 +42,9 @@ _REWRITES = [
         (("tugboat", "stack_alerts", "enabled"), True),
         (("docker", "stack_alerts", "enabled"), True),
     ]),
+    ("2026-10-14-install-reboot-if-needed", [
+        (("host_update", "install_button_name"), "Update and reboot if needed", "Update and reboot"),
+    ]),
 ]
 
 
@@ -51,10 +54,12 @@ def _apply_rewrites(config: dict, config_path: str) -> bool:
     for rid, values in _REWRITES:
         if rid in done:
             continue
-        for path, value in values:
+        for path, value, *only_from in values:
             node = config
             for key in path[:-1]:
                 node = node.get(key) if isinstance(node, dict) else None
+            if only_from and isinstance(node, dict) and node.get(path[-1]) != only_from[0]:
+                continue
             if isinstance(node, dict) and node.get(path[-1]) != value:
                 node[path[-1]] = value
                 changed = True
