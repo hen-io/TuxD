@@ -6,6 +6,7 @@ import yaml
 import time
 import datetime
 
+from modules.config_sync import write_config
 from modules.password import is_password_hash, verify_password
 
 
@@ -103,8 +104,7 @@ class ConfigAgentMixin:
         device = cfg.setdefault("device", {})
         device.pop("password", None)
         device["password_hash"] = password_hash
-        with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        write_config(_CONFIG_FILE, cfg)
         self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
         live = self.config.setdefault("device", {})
         live.pop("password", None)

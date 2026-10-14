@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import yaml
 from pathlib import Path
 
@@ -116,6 +117,78 @@ def _parse_conf_vars(text: str) -> tuple:
         i += 1
 
     return section_labels, section_samples
+
+
+_KEY_LINE = re.compile(r'^( *)([A-Za-z0-9_.\-]+):(\s|$)')
+
+
+def _parse_option_comments(text: str) -> dict:
+    comments = {}
+    stack = []
+    pending = []
+    in_example = False
+    lines = text.splitlines()
+    for i, raw in enumerate(lines):
+        stripped = raw.strip()
+        if in_example:
+            if raw.startswith('#'):
+                continue
+            in_example = False
+        if raw.startswith('# Example'):
+            in_example, pending = True, []
+            continue
+        if stripped == _SEP_BAR or (stripped.startswith('# ') and stripped.endswith('#') and i and lines[i - 1].strip() == _SEP_BAR):
+            pending = []
+            continue
+        if stripped.startswith('#'):
+            pending.append(stripped)
+            continue
+        if not stripped:
+            pending = []
+            continue
+        m = _KEY_LINE.match(raw)
+        if not m:
+            pending = []
+            continue
+        indent = len(m.group(1))
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, m.group(2)))
+        if pending:
+            comments[tuple(k for _, k in stack)] = pending
+        pending = []
+    return comments
+
+
+def _option_comments_missing(text: str, comments: dict) -> bool:
+    present = {line.strip() for line in text.splitlines()}
+    return any(block[0] not in present for block in comments.values())
+
+
+def _inject_option_comments(yaml_text: str, comments: dict) -> str:
+    out = []
+    stack = []
+    list_indent = None
+    for line in yaml_text.splitlines(keepends=True):
+        body = line.rstrip('\n')
+        indent = len(body) - len(body.lstrip(' '))
+        if body.lstrip().startswith('- ') or body.lstrip() == '-':
+            list_indent = indent
+            out.append(line)
+            continue
+        if list_indent is not None and indent > list_indent:
+            out.append(line)
+            continue
+        list_indent = None
+        m = _KEY_LINE.match(body)
+        if m:
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            stack.append((indent, m.group(2)))
+            for comment in comments.get(tuple(k for _, k in stack), []):
+                out.append(' ' * indent + comment + '\n')
+        out.append(line)
+    return ''.join(out)
 
 
 def _migrate_interval_keys(config: dict) -> bool:
@@ -338,6 +411,7 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
 
     conf_vars_text = conf_vars_file.read_text(encoding='utf-8')
     section_labels, section_samples = _parse_conf_vars(conf_vars_text)
+    option_comments = _parse_option_comments(conf_vars_text)
     sample_markers = {key: sample.splitlines()[0] for key, sample in section_samples.items()}
 
     original_text = config_file.read_text(encoding='utf-8') if config_file.exists() else ''
@@ -387,16 +461,27 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
     present_samples = _samples_present(original_text, sample_markers)
     needed_samples = {k for k in config if k in section_samples} - present_samples
 
-    if not migration_changed and not yaml_changed and not item_defaults_changed and not order_changed and not needed_seps and not needed_samples and not samples_changed:
+    comments_missing = _option_comments_missing(original_text, option_comments)
+
+    if not migration_changed and not yaml_changed and not item_defaults_changed and not order_changed and not needed_seps and not needed_samples and not samples_changed and not comments_missing:
         return False
 
     header = _extract_header_comments(original_text)
     body = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    body = _inject_option_comments(body, option_comments)
     body = _inject_separators_and_samples(body, set(config.keys()), section_labels, section_samples)
     config_file.write_text(header + body, encoding='utf-8')
     _make_private(config_file)
     _write_samples_hash(config_path, current_hash)
     return True
+
+
+def write_config(config_path: str, config: dict) -> None:
+    Path(config_path).write_text(
+        yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False), encoding='utf-8')
+    bin_dir = Path(__file__).resolve().parent.parent / 'bin'
+    sync_config(config_path, str(bin_dir / 'conf_vars_defaults.yaml'), str(bin_dir / 'conf_object_defaults.yaml'))
+    _make_private(Path(config_path))
 
 
 def _make_private(config_file):

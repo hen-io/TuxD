@@ -3,6 +3,8 @@ import os
 
 import yaml
 
+from modules.config_sync import write_config
+
 from .config_agent import _CONFIG_FILE
 from .shared import slugify as _slug
 
@@ -103,8 +105,7 @@ class StackAlertMixin:
             with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
                 cfg = yaml.safe_load(f) or {}
             self._stack_alert_store(cfg, source, name, level)
-            with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
-                yaml.dump(cfg, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            write_config(_CONFIG_FILE, cfg)
             self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
         except Exception:
             return
