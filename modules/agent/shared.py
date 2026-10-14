@@ -1,5 +1,8 @@
+import os
 import re
+import signal
 import subprocess
+import threading
 
 
 def slugify(s):
@@ -28,6 +31,54 @@ def entity_object_id(object_id):
 
 
 SENSOR_CMD_TIMEOUT = 60
+
+
+def stream_cmd(cmd, on_line=None, env=None, timeout=None):
+    if not cmd or not str(cmd).strip():
+        return ""
+    lines = []
+
+    def emit(line):
+        lines.append(line)
+        if on_line:
+            try:
+                on_line(line)
+            except Exception:
+                pass
+
+    try:
+        proc = subprocess.Popen(
+            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, errors="replace", bufsize=1, env=env,
+            start_new_session=bool(timeout),
+        )
+    except Exception as e:
+        emit(f"ERR: {e}")
+        return lines[0]
+    timer = None
+    timed_out = []
+
+    def stop():
+        timed_out.append(True)
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except Exception:
+            proc.kill()
+
+    if timeout:
+        timer = threading.Timer(timeout, stop)
+        timer.daemon = True
+        timer.start()
+    try:
+        for line in proc.stdout:
+            emit(line.rstrip("\r\n"))
+        proc.wait()
+    finally:
+        if timer:
+            timer.cancel()
+    if timed_out:
+        emit(f"ERR: timed out after {timeout}s")
+    return "\n".join(lines).strip()
 
 
 def run_cmd(cmd: str, env=None, timeout=None):

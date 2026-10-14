@@ -1,6 +1,7 @@
 import json
 import os
 import threading
+import time
 from datetime import datetime, timezone
 
 from .shared import slugify as _slug
@@ -446,20 +447,21 @@ class TugboatMixin:
     def _run_tugboat_action(self, stack, action, reset_selects=True, extra=()):
         flag = self._tugboat_actions.get(action)
         targets = list(self._tugboat_known_stacks) if stack == self._tugboat_all_stacks else [stack]
+        show = self._terminal_output_enabled()
+
+        def on_line(line):
+            if line:
+                self.publish(self.terminal_output_topic, line)
+
         try:
-            outputs = []
             for target in targets:
                 with self.busy(f"tugboat: {action} {target}"):
-                    outputs.append(run_command(self._tugboat_python_bin, self._tugboat_path, flag, target, extra=extra))
+                    if show:
+                        self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: TugBoat {action} {target}')
+                    run_command(self._tugboat_python_bin, self._tugboat_path, flag, target, extra=extra,
+                                on_line=on_line if show else None)
                     if flag != "--healthcheck":
                         run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", target)
-            output = "\n".join(o for o in outputs if o)
-
-            if output and self._terminal_output_enabled():
-                for line in output.splitlines():
-                    if line:
-                        self.publish(self.terminal_output_topic, line)
-
             status = read_status(self._tugboat_path)
             if status:
                 self._publish_tugboat_status(status)

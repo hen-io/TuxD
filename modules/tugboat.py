@@ -67,14 +67,11 @@ def build_command(python_bin, path, action_flag, stack=None, extra=()):
     )
 
 
-def run_command(python_bin, path, action_flag, stack, timeout=1800, extra=()):
+def run_command(python_bin, path, action_flag, stack, timeout=1800, extra=(), on_line=None):
+    from modules.agent.shared import stream_cmd
     cmd = build_command(python_bin, path, action_flag, stack, extra)
     try:
-        result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=timeout,
-        )
-        out = (result.stdout or "") + (result.stderr or "")
-        return out.strip()
+        return stream_cmd(cmd, on_line, timeout=timeout)
     except Exception as e:
         return f"ERR: {e}"
 

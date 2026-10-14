@@ -286,17 +286,11 @@ class HostUpdateMixin:
         name = _STANDARD_BUTTONS[slug][0]
         out = ""
         try:
-            if self._terminal_output_enabled():
-                self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: Button "{name}" pressed! > {cmd}')
             if slug == "update_and_reboot":
                 self.set_warning(True, f'"{name}" button triggered a reboot/shutdown')
             self._set_host_update_progress(True)
             with self.busy(f"button: {name}"):
-                out = run_cmd(cmd)
-            if out and self._terminal_output_enabled():
-                for line in out.splitlines():
-                    if line:
-                        self.publish(self.terminal_output_topic, line)
+                out = self.run_to_terminal(cmd, f'Button "{name}" pressed!')
         except Exception:
             pass
         finally:
@@ -342,11 +336,7 @@ class HostUpdateMixin:
             pass
         try:
             with self.busy("host update"):
-                out = run_cmd(cmd)
-            if self._terminal_output_enabled() and out:
-                for line in out.splitlines():
-                    if line:
-                        self.publish(self.terminal_output_topic, line)
+                self.run_to_terminal(cmd, "Installing host updates")
         except Exception:
             pass
 

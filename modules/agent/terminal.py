@@ -7,6 +7,8 @@ import threading
 import time
 from collections import deque
 
+from .shared import stream_cmd
+
 TERMINAL_STOP_SENTINEL = "__tuxd_stop__"
 
 TERMINAL_CLEAR_SENTINEL = "__tuxd_clear__"
@@ -31,6 +33,17 @@ class TerminalMixin:
         if getattr(self, "_interactive", False):
             return True
         return bool(self._terminal_output_cfg().get("enabled", True))
+
+    def run_to_terminal(self, cmd, title=None, timeout=None):
+        show = self._terminal_output_enabled()
+        if show and title:
+            self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: {title} > {cmd}')
+
+        def on_line(line):
+            if line:
+                self.publish(self.terminal_output_topic, line)
+
+        return stream_cmd(cmd, on_line if show else None, timeout=timeout)
 
     def _cmd_filter_cfg(self):
         val = self._terminal_input_cfg().get("command_filter", {})

@@ -536,11 +536,7 @@ class DockerMixin:
         self._set_docker_image_progress(base, slug, True)
         try:
             with self.busy(f"docker update: {ref or slug}"):
-                out = run_cmd(cmd)
-            if self._terminal_output_enabled() and out:
-                for line in out.splitlines():
-                    if line:
-                        self.publish(self.terminal_output_topic, line)
+                self.run_to_terminal(cmd, f"Updating {ref or slug}")
 
             conts = compose_containers(self._docker_compose_files, docker_bin)
             info = inspect_containers([c["id"] for c in conts], docker_bin)
