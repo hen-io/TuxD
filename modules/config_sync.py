@@ -37,14 +37,25 @@ def _write_samples_hash(config_path: str, hash_val: str):
     _write_meta(config_path, samples_hash=hash_val)
 
 
+_RETIRED = [
+    ("tugboat", "update_interval"),
+]
+
+
+def _remove_retired(config: dict) -> bool:
+    changed = False
+    for section, key in _RETIRED:
+        node = config.get(section)
+        if isinstance(node, dict) and key in node:
+            del node[key]
+            changed = True
+    return changed
+
+
 _REWRITES = [
     ("2026-10-11-tugboat-defaults", [
-        (("tugboat", "update_interval"), 10),
         (("tugboat", "stack_alerts", "enabled"), True),
         (("docker", "stack_alerts", "enabled"), True),
-    ]),
-    ("2026-10-15-tugboat-watch", [
-        (("tugboat", "update_interval"), 300, 10),
     ]),
     ("2026-10-14-install-reboot-if-needed", [
         (("host_update", "install_button_name"), "Update and reboot if needed", "Update and reboot"),
@@ -440,6 +451,8 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
                 item_defaults = {}
 
     migration_changed = _migrate_interval_keys(config)
+    if _remove_retired(config):
+        migration_changed = True
     yaml_changed = _deep_merge_defaults(config, defaults)
     if _migrate_update_buttons(config):
         migration_changed = True

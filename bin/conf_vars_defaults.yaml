@@ -214,9 +214,6 @@ tugboat:
   enabled: false
   path: ""
   python_bin: "python3"
-  # The status file is watched and read when it changes; this is only the
-  # longest it goes unread, in seconds.
-  update_interval: 300
   # An unhealthy stack raises the host's warning (default: off | warning |
   # error). enabled adds a select per stack to change it from Home
   # Assistant; the selects fill in "stacks".

@@ -48,7 +48,7 @@ class TugboatMixin:
         self._tugboat_enabled = bool(cfg.get("enabled", False))
         self._tugboat_path = str(cfg.get("path") or "").strip()
         self._tugboat_python_bin = str(cfg.get("python_bin") or "python3").strip() or "python3"
-        self._tugboat_interval = float(cfg.get("update_interval", 10))
+        self._tugboat_interval = 300.0
         self._tugboat_known_stacks = []
         self._tugboat_stack_placeholder = self.tr("Select stack...")
         self._tugboat_action_placeholder = self.tr("Select action...")
