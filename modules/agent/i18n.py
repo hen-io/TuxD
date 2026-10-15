@@ -1,6 +1,21 @@
 LANGUAGES = ("en", "nb")
 
 _NB = {
+    "Actions": "Handlinger",
+    "Action": "Handling",
+    "Action Target": "Handlingsmål",
+    "Execute Action": "Utfør handling",
+    "Select target...": "Velg mål...",
+    "Target": "Mål",
+    "Systemd services": "Systemd-tjenester",
+    "Service": "Tjeneste",
+    "Stack": "Stack",
+    "Enable": "Aktiver",
+    "Disable": "Deaktiver",
+    "Refresh sensors": "Oppdater sensorer",
+    "Restart agent": "Start agenten på nytt",
+    "Check for agent updates": "Se etter agentoppdateringer",
+    "Check host updates": "Se etter systemoppdateringer",
     "Select stack...": "Velg stack...",
     "Select action...": "Velg handling...",
     "All stacks": "Alle stacks",

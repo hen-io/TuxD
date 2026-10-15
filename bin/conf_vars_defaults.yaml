@@ -231,6 +231,46 @@ tugboat:
 #     default: "error"
 
 #################################
+# Systemd                       #
+#################################
+
+systemd:
+  enabled: false
+  update_interval: 30
+  # A listed service that fails raises the host's warning (off | warning | error).
+  failed_alert: "warning"
+  # Only these are watched and can be started, stopped, restarted, enabled
+  # or disabled from Home Assistant. "user:" in front = a user service.
+  services: []
+
+# Example:
+# systemd:
+#   enabled: true
+#   services:
+#     - "nginx.service"
+#     - "docker"
+#     - "user:syncthing.service"
+
+#################################
+# Actions                       #
+#################################
+
+# Your own actions: picked in the Action select and run with Execute Action
+# (or from the actions card). With targets, {target} in cmd is replaced by
+# the one picked in the Action Target select.
+actions: []
+
+# Example:
+# actions:
+#   - name: "Clear app cache"
+#     cmd: "sudo rm -rf /var/cache/myapp/*"
+#     confirm: true
+#   - name: "Restart container"
+#     cmd: "docker restart {target}"
+#     targets: ["web", "db"]
+#     target_name: "Container"
+
+#################################
 # Host Update                   #
 #################################
 

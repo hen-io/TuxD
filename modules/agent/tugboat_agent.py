@@ -235,6 +235,8 @@ class TugboatMixin:
                 self.publish(self._discovery_topic("sensor", f"tugboat_{slug}_health"), "", retain=True)
                 self._forget_tugboat_states(f"{self.base_topic}/tugboat/{slug}/")
             self._register_tugboat_selects()
+            if hasattr(self, "publish_action_catalog"):
+                self.publish_action_catalog()
 
         for name, info in stacks.items():
             if not isinstance(info, dict):

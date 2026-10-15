@@ -14,7 +14,7 @@ _CONFIG_FILE = "tuxd.conf"
 
 
 class ConfigAgentMixin:
-    _REQUEST_ACTIONS = ("get", "set", "set_password", "terminal", "terminal_stop")
+    _REQUEST_ACTIONS = ("get", "set", "set_password", "terminal", "terminal_stop", "run_action")
 
     def password_check(self, given):
         device = self.config.get("device", {}) or {}
@@ -49,6 +49,11 @@ class ConfigAgentMixin:
             if action == "set_password":
                 self._set_password_hash(str(request.get("content") or ""))
                 self._send_config_response(request_id, True)
+                return
+
+            if action == "run_action":
+                error = self.run_integration_action(str(request.get("content") or ""))
+                self._send_config_response(request_id, error is None, error=error)
                 return
 
             if action in ("terminal", "terminal_stop"):

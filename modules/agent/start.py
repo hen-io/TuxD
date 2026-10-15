@@ -27,6 +27,7 @@ from .stack_alert_agent import StackAlertMixin
 from .select_agent import SelectMixin
 from .default_entities_agent import DefaultEntitiesMixin
 from .system_status_agent import SystemStatusMixin
+from .integrations_agent import IntegrationsMixin
 
 
 class TuxDAgentMixin(
@@ -51,6 +52,7 @@ class TuxDAgentMixin(
     ConfigAgentMixin,
     StackAlertMixin,
     SystemStatusMixin,
+    IntegrationsMixin,
 ):
     def __init__(self, config, version, log_file=None, log_level="all", update_status="Up to date",
                  update_checker=None, update_applier=None):
@@ -80,6 +82,7 @@ class TuxDAgentMixin(
         self.init_tasks()
         self.init_selects()
         self.init_system_status()
+        self.init_integrations()
 
     def tr(self, text):
         return translate(self.language, text)
@@ -229,6 +232,7 @@ class TuxDAgentMixin(
             self.register_lm_sensors,
             self.register_selects,
             self.register_system_status,
+            self.register_integrations,
         )
         for registrar in registrars:
             try:
@@ -293,6 +297,10 @@ class TuxDAgentMixin(
             self.handle_docker_update_install(topic)
             return
 
+        if topic.startswith(f"{self.base_topic}/actions/") and topic.endswith("/set"):
+            self.handle_actions_command(topic, payload)
+            return
+
         if topic == f"{self.base_topic}/tugboat/select_stack/set":
             self.handle_tugboat_stack_select(payload)
             return
@@ -350,6 +358,7 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/refresh/set")
         self.client.subscribe(f"{self.base_topic}/force_poll/set")
         self.client.subscribe(f"{self.base_topic}/select/+/set")
+        self.client.subscribe(f"{self.base_topic}/actions/+/set")
         self.client.subscribe(f"{self.base_topic}/stack_alert/+/+/set")
         self.client.subscribe(f"{self.base_topic}/docker/update/+/set")
         self.client.subscribe(f"{self.base_topic}/host_update/set")
@@ -417,6 +426,8 @@ class TuxDAgentMixin(
 
         if self.config.get("tasks"):
             threading.Thread(target=self.tasks_loop, daemon=True).start()
+
+        self.start_integrations()
 
         try:
             self._stop_event.wait()
