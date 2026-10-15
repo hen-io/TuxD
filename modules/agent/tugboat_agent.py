@@ -524,12 +524,27 @@ class TugboatMixin:
     def tugboat_loop(self):
         if not self._tugboat_active():
             return
+        last_sig = None
+        last_read = 0.0
+        path = ""
+        path_at = 0.0
         while not self._stop_event.is_set():
             try:
-                if not self._tugboat_running:
+                now = time.monotonic()
+                if not path or now - path_at > 60:
+                    path, path_at = status_file_path(self._tugboat_path), now
+                try:
+                    st = os.stat(path)
+                    sig = (st.st_mtime_ns, st.st_size)
+                except OSError:
+                    sig = None
+                due = now - last_read >= max(self._tugboat_interval, 1.0)
+                if not self._tugboat_running and (sig != last_sig or due):
                     status = read_status(self._tugboat_path)
+                    last_read = now
                     if status:
+                        last_sig = sig
                         self._publish_tugboat_status(status)
             except Exception:
                 pass
-            self._stop_event.wait(timeout=self._tugboat_interval)
+            self._stop_event.wait(timeout=1.0)

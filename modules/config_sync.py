@@ -43,6 +43,9 @@ _REWRITES = [
         (("tugboat", "stack_alerts", "enabled"), True),
         (("docker", "stack_alerts", "enabled"), True),
     ]),
+    ("2026-10-15-tugboat-watch", [
+        (("tugboat", "update_interval"), 300, 10),
+    ]),
     ("2026-10-14-install-reboot-if-needed", [
         (("host_update", "install_button_name"), "Update and reboot if needed", "Update and reboot"),
     ]),
