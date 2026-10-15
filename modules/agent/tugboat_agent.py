@@ -1,3 +1,4 @@
+import base64
 import json
 import os
 import threading
@@ -5,7 +6,39 @@ import time
 from datetime import datetime, timezone
 
 from .shared import slugify as _slug
-from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names
+from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names, status_file_path
+
+LOCAL_ICON_TYPES = {".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp",
+                    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif"}
+LOCAL_ICON_MAX_BYTES = 128 * 1024
+_LOCAL_ICONS = {}
+
+
+def _local_icon(folder, rel):
+    if not folder or not isinstance(rel, str) or not rel.strip():
+        return ""
+    root = os.path.realpath(folder)
+    path = os.path.realpath(os.path.join(root, rel.strip()))
+    kind = LOCAL_ICON_TYPES.get(os.path.splitext(path)[1].lower())
+    if not kind or os.path.commonpath([root, path]) != root:
+        return ""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return ""
+    if st.st_size > LOCAL_ICON_MAX_BYTES:
+        return ""
+    cached = _LOCAL_ICONS.get(path)
+    if cached and cached[0] == (st.st_mtime, st.st_size):
+        return cached[1]
+    try:
+        with open(path, "rb") as f:
+            data = f.read(LOCAL_ICON_MAX_BYTES + 1)
+    except OSError:
+        return ""
+    uri = f"data:{kind};base64,{base64.b64encode(data).decode()}" if len(data) <= LOCAL_ICON_MAX_BYTES else ""
+    _LOCAL_ICONS[path] = ((st.st_mtime, st.st_size), uri)
+    return uri
 
 
 class TugboatMixin:
@@ -181,8 +214,15 @@ class TugboatMixin:
         if getattr(self, "state_cache", {}).get(topic) != payload:
             self.publish(topic, payload)
 
+    def _tugboat_icon_folder(self):
+        try:
+            return os.path.dirname(status_file_path(self._tugboat_path))
+        except Exception:
+            return ""
+
     def _publish_tugboat_status(self, status):
         stacks = status.get("stacks", {})
+        folder = self._tugboat_icon_folder()
         new_names = sorted(stacks.keys())
         if new_names != self._tugboat_known_stacks:
             added = [n for n in new_names if n not in self._tugboat_known_stacks]
@@ -220,7 +260,7 @@ class TugboatMixin:
                 "last_backup": info.get("last_backup", ""),
                 "updates_available": info.get("updates_available", 0),
                 "images_checked_at": info.get("images_checked_at", ""),
-                "icon_url": self._tugboat_icon_url(info),
+                "icon_url": self._tugboat_icon_url(info, folder),
             }))
 
         self._publish_tugboat_version(status)
@@ -250,6 +290,7 @@ class TugboatMixin:
     def _publish_tugboat_images(self, stacks):
         seen = {}
         ages = set()
+        folder = self._tugboat_icon_folder()
         for name, info in stacks.items():
             if not isinstance(info, dict) or not isinstance(info.get("images"), list):
                 continue
@@ -266,7 +307,7 @@ class TugboatMixin:
                     entity_category="diagnostic",
                     ha_object_id=f"{self.device_slug}_tugboat_{stack_slug}",
                 )
-            state = self._tugboat_stack_state(name, info["images"], self._tugboat_icon_url(info))
+            state = self._tugboat_stack_state(name, info["images"], self._tugboat_icon_url(info, folder))
             seen[oid] = (name, f"{topic}/state", state)
             self._tugboat_publish(f"{topic}/state", json.dumps(state))
             ages.update(self._publish_tugboat_ages(name, stack_slug, info["images"]))
@@ -340,9 +381,11 @@ class TugboatMixin:
         return ids
 
     @staticmethod
-    def _tugboat_icon_url(info):
-        urls = [info.get("icon_url")] + [i.get("icon_url") for i in info.get("images") or [] if isinstance(i, dict)]
-        return next((u.strip() for u in urls if isinstance(u, str) and u.strip().startswith(("https://", "http://"))), "")
+    def _tugboat_icon_url(info, folder=""):
+        def web(url):
+            return url.strip() if isinstance(url, str) and url.strip().startswith(("https://", "http://")) else ""
+        return (web(info.get("icon_url")) or _local_icon(folder, info.get("icon"))
+                or next((u for u in (web(i.get("icon_url")) for i in info.get("images") or [] if isinstance(i, dict)) if u), ""))
 
     @staticmethod
     def _tugboat_stack_state(name, images, icon_url=""):
