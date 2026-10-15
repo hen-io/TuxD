@@ -10,6 +10,7 @@ _NB = {
     "Health Check": "Helsesjekk",
     "Restart": "Start på nytt",
     "Rollback": "Tilbakerull",
+    "Remove": "Fjern",
     "Newest backup": "Nyeste sikkerhetskopi",
     "TugBoat Backup": "TugBoat-sikkerhetskopi",
     "Health": "Helse",

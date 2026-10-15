@@ -12,6 +12,7 @@ ACTIONS = {
     "Stop": "--stop",
     "Restart": "--restart",
     "Rollback": "--rollback",
+    "Remove": "--remove",
     "Health Check": "--healthcheck",
 }
 
