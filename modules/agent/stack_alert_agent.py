@@ -1,6 +1,6 @@
 import json
 
-from .shared import slugify as _slug
+from .shared import item_name, slugify as _slug
 
 _LEVELS = (("off", "Off"), ("warning", "Warning"), ("error", "Error"))
 
@@ -11,6 +11,7 @@ _SOURCES = {
     "proxmox": ("guest_alerts", "guests", "Guests not running", "Alert"),
 }
 _DEFAULT_SOURCE = _SOURCES["tugboat"]
+_COMPONENT_NAMES = {"tugboat": "TugBoat", "docker": "Docker", "systemd": "Systemd", "proxmox": "Proxmox"}
 
 
 class StackAlertMixin:
@@ -66,7 +67,8 @@ class StackAlertMixin:
         oid = f"cfgselect_{source}_{slug}_alert"
         state_topic = f"{self.base_topic}/stack_alert/{source}/{slug}"
         self.publish(self._discovery_topic("select", oid), json.dumps({
-            "name": f"{self._stack_alert_label(source, name)} {self.tr(self._alert_profile(source)[3])}",
+            "name": item_name(self.device_slug, self._stack_alert_label(source, name), self.tr(self._alert_profile(source)[3]),
+                                   _COMPONENT_NAMES.get(source, source)),
             "state_topic": state_topic,
             "command_topic": f"{state_topic}/set",
             "options": list(self._stack_alert_labels.values()),

@@ -3,7 +3,7 @@ import os
 import threading
 import time
 
-from .shared import run_cmd, slugify as _slug
+from .shared import item_name, run_cmd, slugify as _slug
 from modules.docker_monitor import (
     compose_containers,
     inspect_containers,
@@ -107,7 +107,7 @@ class DockerMixin:
         slug = _slug(name)
         self._sensor_discovery(
             f"docker_stack_{slug}_health",
-            f"{name} {self.tr('Health')}",
+            item_name(self.device_slug, name, self.tr("Health"), "Docker"),
             f"{self.base_topic}/docker/stack/{slug}/health",
             icon="mdi:docker",
             attributes_topic=f"{self.base_topic}/docker/stack/{slug}/health_attributes",
@@ -198,7 +198,7 @@ class DockerMixin:
 
         self._update_discovery(
             f"docker_image_{slug}_update",
-            f"{prefix}{image_ref}",
+            item_name(self.device_slug, f"{prefix}{image_ref}", "", "Docker"),
             f"{base}/state",
             command_topic=command_topic,
             icon="mdi:docker",
@@ -346,7 +346,7 @@ class DockerMixin:
         for key, label, unit, icon in metrics:
             self._sensor_discovery(
                 f"docker_stat_{slug}_{key}",
-                f"{cname} {label}",
+                item_name(self.device_slug, cname, label, "Docker"),
                 f"{sbase}/{key}",
                 unit=unit,
                 icon=icon,

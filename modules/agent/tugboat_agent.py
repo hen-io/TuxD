@@ -5,7 +5,7 @@ import threading
 import time
 from datetime import datetime, timezone
 
-from .shared import slugify as _slug
+from .shared import item_name, slugify as _slug
 from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names, status_file_path
 
 LOCAL_ICON_TYPES = {".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp",
@@ -126,7 +126,7 @@ class TugboatMixin:
         slug = _slug(name)
         self._sensor_discovery(
             f"tugboat_{slug}_health",
-            f"{name} {self.tr('Health')}",
+            item_name(self.device_slug, name, self.tr("Health"), "TugBoat"),
             f"{self.base_topic}/tugboat/{slug}/health",
             icon="mdi:ferry",
             attributes_topic=f"{self.base_topic}/tugboat/{slug}/health_attributes",
@@ -328,7 +328,7 @@ class TugboatMixin:
             if oid not in self._tugboat_images:
                 self._update_discovery(
                     oid,
-                    f"{name} {self.tr('image updates')}",
+                    item_name(self.device_slug, name, self.tr("image updates"), "TugBoat"),
                     f"{topic}/state",
                     command_topic=f"{topic}/set",
                     icon="mdi:ferry",
@@ -389,7 +389,7 @@ class TugboatMixin:
             if oid not in self._tugboat_ages:
                 self._sensor_discovery(
                     oid,
-                    f"{short} {self.tr('since released')}",
+                    item_name(self.device_slug, short, self.tr("since released"), "TugBoat"),
                     f"{topic}/state",
                     unit="d",
                     icon="mdi:calendar-clock",
