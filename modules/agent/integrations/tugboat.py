@@ -26,7 +26,6 @@ class TugboatActionsIntegration(Integration):
     def run(self, action_id, target):
         label = next(lab for lab in ACTIONS if lab.lower().replace(" ", "_") == action_id)
         agent = self.agent
-        if agent._tugboat_running:
+        if not agent._tugboat_claim():
             raise RuntimeError("TugBoat is already running an action")
-        agent._tugboat_running = True
         agent._run_tugboat_action(target, agent.tr(label), False)

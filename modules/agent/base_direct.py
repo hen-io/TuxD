@@ -252,6 +252,8 @@ class HADirectBase:
             msg = json.loads(raw)
         except Exception:
             return
+        if not isinstance(msg, dict):
+            return
         if msg.get("type") == "command":
             key = msg.get("key", "")
             payload = msg.get("payload", "")

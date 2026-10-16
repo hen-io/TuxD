@@ -127,7 +127,9 @@ class TerminalMixin:
             return
         device = self.config.get("device", {}) or {}
         locked = bool(device.get("password_hash") or device.get("password"))
-        self.publish(f"{self.terminal_output_topic}/attributes", json.dumps({"password_required": locked}))
+        self.publish(f"{self.terminal_output_topic}/attributes", json.dumps({
+            "password_required": locked, "terminal_input": self._terminal_input_enabled(),
+        }))
 
     def _terminal_prompt(self, cmd):
         return f"{self._terminal_username}:~$ {cmd}"
@@ -179,6 +181,7 @@ class TerminalMixin:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                errors="replace",
                 bufsize=1,
                 cwd=os.path.expanduser("~"),
                 start_new_session=True,
@@ -285,7 +288,11 @@ class TerminalMixin:
                 published += 1
                 return True
 
-            with self.busy(f"terminal: {cmd}"):
-                self._stream_cmd(cmd, _on_line, max_runtime)
+            try:
+                with self.busy(f"terminal: {cmd}"):
+                    self._stream_cmd(cmd, _on_line, max_runtime)
+            except Exception as e:
+                if self._terminal_output_enabled():
+                    self.publish(self.terminal_output_topic, f"[failed: {e}]")
 
             self.publish(self.terminal_input_topic, "")

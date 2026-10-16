@@ -123,6 +123,12 @@ class SelfUpdateMixin:
         url = (url or "").strip()
         if not url:
             return
+        device = self.config.get("device", {}) or {}
+        if device.get("password_hash") or device.get("password"):
+            if self._terminal_output_enabled():
+                self.publish(self.terminal_output_topic,
+                             "[Install from URL refused: this device has a password. Update from GitHub instead.]")
+            return
 
         self._self_update_installing = True
         threading.Thread(target=self._run_self_update_install_from_url, args=(url,), daemon=True).start()

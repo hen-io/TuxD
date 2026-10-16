@@ -361,6 +361,8 @@ class TuxDAgentMixin(
         self.client.subscribe(f"{self.base_topic}/actions/+/set")
         self.client.subscribe(f"{self.base_topic}/stack_alert/+/+/set")
         self.client.subscribe(f"{self.base_topic}/docker/update/+/set")
+        self.client.subscribe(f"{self.base_topic}/tugboat/+/set")
+        self.client.subscribe(f"{self.base_topic}/tugboat/image/+/set")
         self.client.subscribe(f"{self.base_topic}/host_update/set")
         self.client.subscribe(f"{self.base_topic}/host_update/check/set")
         self.client.subscribe(f"{self.base_topic}/self_update/set")

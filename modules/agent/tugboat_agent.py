@@ -57,11 +57,19 @@ class TugboatMixin:
         self._tugboat_selected_stack = self._tugboat_stack_placeholder
         self._tugboat_selected_action = self._tugboat_action_placeholder
         self._tugboat_running = False
+        self._tugboat_run_lock = threading.Lock()
         self._tugboat_backup_default = self.tr("Newest backup")
         self._tugboat_selected_backup = self._tugboat_backup_default
         self._tugboat_backups = []
         self._tugboat_images = {}
         self._tugboat_ages = set()
+
+    def _tugboat_claim(self):
+        with self._tugboat_run_lock:
+            if self._tugboat_running:
+                return False
+            self._tugboat_running = True
+            return True
 
     def _tugboat_active(self):
         if not self._tugboat_enabled or not self._tugboat_path:
@@ -255,7 +263,7 @@ class TugboatMixin:
                         "health": c.get("health"),
                         "status": c.get("status"),
                     }
-                    for c in (info.get("containers") or [])
+                    for c in (info.get("containers") or []) if isinstance(c, dict)
                 ],
                 "last_action": info.get("last_action", {}),
                 "last_update": info.get("last_update", ""),
@@ -435,9 +443,8 @@ class TugboatMixin:
             return
         stack = next((n for n in self._tugboat_known_stacks if _slug(n) == stack_slug), None)
         action = next((label for label, flag in self._tugboat_actions.items() if flag == "--update"), None)
-        if not stack or not action or self._tugboat_running:
+        if not stack or not action or not self._tugboat_claim():
             return
-        self._tugboat_running = True
         for name, state_topic, state in list(self._tugboat_images.values()):
             if name == stack:
                 self.publish(state_topic, json.dumps(dict(state, in_progress=True)))
@@ -470,19 +477,18 @@ class TugboatMixin:
         self.publish(f"{self.base_topic}/tugboat/select_action", value, retain=True)
 
     def handle_tugboat_execute(self):
-        if self._tugboat_running:
-            return
         if self._tugboat_selected_stack == self._tugboat_stack_placeholder:
             return
         if self._tugboat_selected_action == self._tugboat_action_placeholder:
             return
         extra = ()
-        if self._tugboat_actions.get(self._tugboat_selected_action) == "--rollback":
-            if self._tugboat_selected_stack not in self._tugboat_known_stacks:
-                return
-            if self._tugboat_selected_backup != self._tugboat_backup_default:
-                extra = ("--to", self._tugboat_selected_backup)
-        self._tugboat_running = True
+        flag = self._tugboat_actions.get(self._tugboat_selected_action)
+        if flag in ("--rollback", "--remove") and self._tugboat_selected_stack not in self._tugboat_known_stacks:
+            return
+        if flag == "--rollback" and self._tugboat_selected_backup != self._tugboat_backup_default:
+            extra = ("--to", self._tugboat_selected_backup)
+        if not self._tugboat_claim():
+            return
         threading.Thread(
             target=self._run_tugboat_action,
             args=(self._tugboat_selected_stack, self._tugboat_selected_action, True, extra),

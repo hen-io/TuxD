@@ -1,11 +1,5 @@
 import json
-import os
 
-import yaml
-
-from modules.config_sync import write_config
-
-from .config_agent import _CONFIG_FILE
 from .shared import slugify as _slug
 
 _LEVELS = (("off", "Off"), ("warning", "Warning"), ("error", "Error"))
@@ -116,11 +110,7 @@ class StackAlertMixin:
             return
 
         try:
-            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-                cfg = yaml.safe_load(f) or {}
-            self._stack_alert_store(cfg, source, name, level)
-            write_config(_CONFIG_FILE, cfg)
-            self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
+            self.edit_config(lambda cfg: self._stack_alert_store(cfg, source, name, level))
         except Exception:
             return
 

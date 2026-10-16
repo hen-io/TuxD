@@ -2,6 +2,7 @@ import os
 import json
 import secrets
 import tempfile
+import threading
 import yaml
 import time
 import datetime
@@ -11,6 +12,19 @@ from modules.password import is_password_hash, verify_password
 
 
 _CONFIG_FILE = "tuxd.conf"
+_CONFIG_LOCK = threading.Lock()
+_GUESS_LOCK = threading.Lock()
+
+
+def _unstartable(cfg):
+    device = cfg.get("device") if isinstance(cfg.get("device"), dict) else {}
+    if not str(device.get("name") or "").strip():
+        return "device.name must be set"
+    mode = str((cfg.get("tuxd") or {}).get("connection_mode") or "direct").strip().lower()
+    ha = cfg.get("home-assistant") if isinstance(cfg.get("home-assistant"), dict) else {}
+    if mode == "direct" and not str(ha.get("url") or "").strip():
+        return "home-assistant.url must be set (connection_mode: direct)"
+    return None
 
 
 class ConfigAgentMixin:
@@ -27,7 +41,8 @@ class ConfigAgentMixin:
         ok = verify_password(given, stored) if stored else secrets.compare_digest(str(given), plain)
         if ok:
             return None
-        time.sleep(1.0)
+        with _GUESS_LOCK:
+            time.sleep(1.0)
         return "incorrect"
 
     def handle_config_request(self, payload):
@@ -81,8 +96,12 @@ class ConfigAgentMixin:
             if not isinstance(parsed, dict):
                 self._send_config_response(request_id, False, error="tuxd.conf must contain a YAML mapping")
                 return
+            invalid = _unstartable(parsed)
+            if invalid:
+                self._send_config_response(request_id, False, error=invalid)
+                return
 
-            mode = os.stat(_CONFIG_FILE).st_mode if os.path.exists(_CONFIG_FILE) else 0o600
+            mode = 0o600
             with tempfile.NamedTemporaryFile(
                 "w", encoding="utf-8", dir=".", prefix=".tuxd.conf.", delete=False
             ) as tmp:
@@ -90,8 +109,9 @@ class ConfigAgentMixin:
                 tmp.flush()
                 os.fsync(tmp.fileno())
                 temp_path = tmp.name
-            os.chmod(temp_path, mode & 0o777)
-            os.replace(temp_path, _CONFIG_FILE)
+            os.chmod(temp_path, mode)
+            with _CONFIG_LOCK:
+                os.replace(temp_path, _CONFIG_FILE)
             self._send_config_response(request_id, True)
         except Exception as e:
             try:
@@ -101,16 +121,23 @@ class ConfigAgentMixin:
                 pass
             self._send_config_response(request_id, False, error=str(e))
 
+    def edit_config(self, change):
+        with _CONFIG_LOCK:
+            with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg = yaml.safe_load(f) or {}
+            change(cfg)
+            write_config(_CONFIG_FILE, cfg)
+            self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
+
     def _set_password_hash(self, password_hash):
         if password_hash and not is_password_hash(password_hash):
             raise ValueError("Not a password hash")
-        with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-            cfg = yaml.safe_load(f) or {}
-        device = cfg.setdefault("device", {})
-        device.pop("password", None)
-        device["password_hash"] = password_hash
-        write_config(_CONFIG_FILE, cfg)
-        self._config_own_write_mtime = os.path.getmtime(_CONFIG_FILE)
+
+        def change(cfg):
+            device = cfg.setdefault("device", {})
+            device.pop("password", None)
+            device["password_hash"] = password_hash
+        self.edit_config(change)
         live = self.config.setdefault("device", {})
         live.pop("password", None)
         live["password_hash"] = password_hash
