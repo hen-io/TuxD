@@ -8,6 +8,7 @@ _SOURCES = {
     "tugboat": ("stack_alerts", "stacks", "Unhealthy stacks", "Health Alert"),
     "docker": ("stack_alerts", "stacks", "Unhealthy stacks", "Health Alert"),
     "systemd": ("service_alerts", "services", "Failed services", "Alert"),
+    "proxmox": ("guest_alerts", "guests", "Guests not running", "Alert"),
 }
 _DEFAULT_SOURCE = _SOURCES["tugboat"]
 
@@ -18,6 +19,7 @@ class StackAlertMixin:
         self._stack_alert_labels = {level: self.tr(label) for level, label in _LEVELS}
         self._stack_alert_selects = {}
         self._stack_alert_health = {}
+        self._stack_alert_labels_by = {}
 
     @staticmethod
     def _alert_profile(source):
@@ -37,14 +39,17 @@ class StackAlertMixin:
     def _stack_alert_level(self, source, name):
         cfg = self._stack_alert_cfg(source)
         stacks = cfg.get(self._alert_profile(source)[1])
-        if isinstance(stacks, dict) and name in stacks:
-            return self._stack_alert_norm(stacks[name])
+        if isinstance(stacks, dict):
+            for key, level in stacks.items():
+                if str(key) == str(name):
+                    return self._stack_alert_norm(level)
         return self._stack_alert_norm(cfg.get("default", "warning"))
 
     def forget_stack_alerts(self, source):
         self._stack_alert_selects.pop(source, None)
 
-    def sync_stack_alerts(self, source, stacks):
+    def sync_stack_alerts(self, source, stacks, labels=None):
+        self._stack_alert_labels_by.setdefault(source, {}).update(labels or {})
         selects = bool(self._stack_alert_cfg(source).get("enabled", True))
         wanted = {_slug(name): name for name in stacks} if selects else {}
         known = self._stack_alert_selects.get(source, {})
@@ -61,7 +66,7 @@ class StackAlertMixin:
         oid = f"cfgselect_{source}_{slug}_alert"
         state_topic = f"{self.base_topic}/stack_alert/{source}/{slug}"
         self.publish(self._discovery_topic("select", oid), json.dumps({
-            "name": f"{name} {self.tr(self._alert_profile(source)[3])}",
+            "name": f"{self._stack_alert_label(source, name)} {self.tr(self._alert_profile(source)[3])}",
             "state_topic": state_topic,
             "command_topic": f"{state_topic}/set",
             "options": list(self._stack_alert_labels.values()),
@@ -86,8 +91,12 @@ class StackAlertMixin:
         def reason(names):
             return f"{self.tr(label)}: {', '.join(names)}"[:250] if names else ""
 
+        raised = {level: [self._stack_alert_label(source, n) for n in names] for level, names in raised.items()}
         self.set_standing_error(f"{source}_{items}", reason(raised["error"]))
         self.set_standing_warning(f"{source}_{items}", reason(raised["warning"]))
+
+    def _stack_alert_label(self, source, name):
+        return self._stack_alert_labels_by.get(source, {}).get(name, name)
 
     @classmethod
     def _stack_alert_store(cls, cfg, source, name, level):

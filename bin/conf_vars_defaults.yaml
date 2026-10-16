@@ -261,6 +261,62 @@ systemd:
 #       nginx.service: "error"
 
 #################################
+# Proxmox VE                    #
+#################################
+
+proxmox:
+  enabled: false
+  update_interval: 30
+  # One sensor per VM / container on this node (its status).
+  guest_sensors: true
+  # Bulk start guests (an action), and at boot in place of Proxmox's own
+  # start. Steps: start_vm (an id, a list or "all"), delay (90s, 2m),
+  # wait. "all" = every guest with "Start at boot", in Proxmox's startup
+  # order, except those a later step names.
+  bulk_start_vms:
+    enabled: false
+    max_runtime: 1800
+    order: []
+  # Bulk stop guests (an action), before TuxD's Reboot / Shutdown, and at
+  # every shutdown in place of Proxmox's own (the boot / shutdown units need
+  # TuxD to run as root). Steps: stop_vm, delay, wait (until the guests
+  # stopped above are down). Shutdowns run in parallel.
+  bulk_stop_vms:
+    enabled: false
+    shutdown_timeout: 180
+    force_stop: true
+    max_runtime: 1800
+    order: []
+  # A "Start at boot" guest that is not running raises the host's warning or
+  # error (default: off | warning | error; "guests" by id). enabled adds a
+  # select per guest to change it from Home Assistant.
+  guest_alerts:
+    enabled: false
+    default: "off"
+    guests: {}
+
+# Example:
+# proxmox:
+#   enabled: true
+#   bulk_start_vms:
+#     enabled: true
+#     order:
+#       - start_vm: 222
+#       - delay: 90s
+#       - start_vm: all
+#   bulk_stop_vms:
+#     enabled: true
+#     order:
+#       - stop_vm: all
+#       - wait: true
+#       - stop_vm: 222
+#         timeout: 300
+#   guest_alerts:
+#     default: "warning"
+#     guests:
+#       222: "error"
+
+#################################
 # Actions                       #
 #################################
 

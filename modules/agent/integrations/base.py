@@ -64,6 +64,9 @@ class Integration:
     def run(self, action_id, target):
         raise NotImplementedError
 
+    def before_power(self, kind):
+        pass
+
     def tr(self, text):
         return self.agent.tr(text)
 

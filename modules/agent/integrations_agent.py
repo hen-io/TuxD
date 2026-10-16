@@ -152,6 +152,14 @@ class IntegrationsMixin:
             except Exception:
                 pass
 
+    def before_power_off(self, kind):
+        for integration in self._active_integrations():
+            try:
+                integration.before_power(kind)
+            except Exception as e:
+                if self._terminal_output_enabled():
+                    self.publish(self.terminal_output_topic, f"[{integration.KEY} before {kind} failed: {e}]")
+
     def run_integration_action(self, content):
         try:
             request = json.loads(content or "{}")

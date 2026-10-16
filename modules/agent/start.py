@@ -317,6 +317,10 @@ class TuxDAgentMixin(
             self.handle_tugboat_execute()
             return
 
+        if topic == f"{self.base_topic}/tugboat/self_update/set":
+            self.handle_tugboat_self_update()
+            return
+
         if topic.startswith(f"{self.base_topic}/tugboat/image/") and topic.endswith("/set"):
             self.handle_tugboat_image_install(topic)
             return

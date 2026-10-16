@@ -108,6 +108,15 @@ class TugboatMixin:
             entity_category="diagnostic",
             ha_object_id=f"{self.device_slug}_tugboat_version",
         )
+        self._update_discovery(
+            "tugboat_self_update",
+            "TugBoat",
+            f"{self.base_topic}/tugboat/self_update/state",
+            command_topic=f"{self.base_topic}/tugboat/self_update/set",
+            icon="mdi:ferry",
+            ha_object_id=f"{self.device_slug}_tugboat",
+        )
+        self._tugboat_self_update_state = None
         self._tugboat_images = {}
         self._tugboat_ages = set()
         if status:
@@ -292,6 +301,15 @@ class TugboatMixin:
                                      and self._version_key(latest) > self._version_key(version)),
             "checked_at": check.get("checked_at", ""),
         }))
+        newer = bool(version and latest and self._version_key(latest) > self._version_key(version))
+        self._tugboat_self_update_state = {
+            "installed_version": version or "unknown",
+            "latest_version": latest if newer else (version or "unknown"),
+            "title": "TugBoat",
+            "release_url": "https://github.com/hen-io/TugBoat/releases",
+            "in_progress": False,
+        }
+        self._tugboat_publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(self._tugboat_self_update_state))
 
     @staticmethod
     def _version_key(text):
@@ -453,6 +471,36 @@ class TugboatMixin:
             args=(stack, action, False),
             daemon=True,
         ).start()
+
+    def handle_tugboat_self_update(self, wait=False):
+        if not self._tugboat_active() or not self._tugboat_claim():
+            return False
+        state = getattr(self, "_tugboat_self_update_state", None)
+        if state:
+            self.publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(dict(state, in_progress=True)))
+
+        def work():
+            show = self._terminal_output_enabled()
+            on_line = (lambda line: line and self.publish(self.terminal_output_topic, line)) if show else None
+            try:
+                with self.busy("tugboat: self-update"):
+                    if show:
+                        self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: TugBoat self-update')
+                    run_command(self._tugboat_python_bin, self._tugboat_path, "--self-update", None, on_line=on_line)
+                    run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", None)
+                status = read_status(self._tugboat_path)
+                if status:
+                    self._publish_tugboat_status(status)
+            finally:
+                self._tugboat_running = False
+                state = getattr(self, "_tugboat_self_update_state", None)
+                if state:
+                    self.publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(state))
+        if wait:
+            work()
+        else:
+            threading.Thread(target=work, daemon=True).start()
+        return True
 
     def handle_tugboat_stack_select(self, payload):
         value = payload.strip()

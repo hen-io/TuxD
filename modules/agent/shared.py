@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
@@ -30,6 +31,22 @@ def entity_object_id(object_id):
     )
 
 
+_SUDO_SHIM = (
+    'sudo() { while [ $# -gt 0 ]; do case "$1" in -u|-g|-p|-C|-h|-U) shift 2;; --) shift; break;; '
+    '-*) shift;; *) break;; esac; done; "$@"; }; '
+)
+_NEEDS_SHIM = None
+
+
+def shell_cmd(cmd):
+    global _NEEDS_SHIM
+    if _NEEDS_SHIM is None:
+        _NEEDS_SHIM = os.geteuid() == 0 and shutil.which("sudo") is None
+    if _NEEDS_SHIM and isinstance(cmd, str) and re.search(r"\bsudo\b", cmd):
+        return _SUDO_SHIM + cmd
+    return cmd
+
+
 SENSOR_CMD_TIMEOUT = 60
 
 
@@ -48,7 +65,7 @@ def stream_cmd(cmd, on_line=None, env=None, timeout=None):
 
     try:
         proc = subprocess.Popen(
-            cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            shell_cmd(cmd), shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, errors="replace", bufsize=1, env=env,
             start_new_session=bool(timeout),
         )
@@ -86,7 +103,7 @@ def run_cmd(cmd: str, env=None, timeout=None):
         return ""
     try:
         result = subprocess.run(
-            cmd,
+            shell_cmd(cmd),
             shell=True,
             capture_output=True,
             text=True,

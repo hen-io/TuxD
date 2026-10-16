@@ -5,9 +5,10 @@ import subprocess
 def _run(cmd):
     if not cmd or not str(cmd).strip():
         return None
+    from modules.agent.shared import shell_cmd
     try:
         result = subprocess.run(
-            cmd,
+            shell_cmd(cmd),
             shell=True,
             capture_output=True,
             text=True,

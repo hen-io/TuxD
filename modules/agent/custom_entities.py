@@ -99,8 +99,11 @@ class CustomEntitiesMixin:
                         self.set_warning(True, f'"{b["name"]}" button triggered a reboot/shutdown')
                     except Exception:
                         pass
+                power = slug if slug in _POWER_BUTTONS and hasattr(self, "before_power_off") else None
                 if write_to_terminal:
                     def _run(c=cmd, n=b["name"]):
+                        if power:
+                            self.before_power_off(power)
                         with self.busy(f"button: {n}"):
                             output = run_cmd(c)
                         if output and self._terminal_output_enabled():
@@ -110,6 +113,8 @@ class CustomEntitiesMixin:
                     threading.Thread(target=_run, daemon=True).start()
                 else:
                     def _run_quiet(c=cmd, n=b["name"]):
+                        if power:
+                            self.before_power_off(power)
                         with self.busy(f"button: {n}"):
                             run_cmd(c)
                     threading.Thread(target=_run_quiet, daemon=True).start()

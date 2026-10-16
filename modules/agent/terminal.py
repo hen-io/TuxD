@@ -8,7 +8,7 @@ import threading
 import time
 from collections import deque
 
-from .shared import stream_cmd
+from .shared import shell_cmd, stream_cmd
 
 TERMINAL_STOP_SENTINEL = "__tuxd_stop__"
 
@@ -176,7 +176,7 @@ class TerminalMixin:
     def _stream_cmd(self, cmd, on_line, timeout):
         try:
             proc = subprocess.Popen(
-                cmd,
+                shell_cmd(cmd),
                 shell=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
