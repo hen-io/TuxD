@@ -3,7 +3,7 @@ import os
 import re
 import shlex
 
-from ..shared import SENSOR_CMD_TIMEOUT, item_name, run_cmd, slugify
+from ..shared import SENSOR_CMD_TIMEOUT, run_cmd, slugify
 from .base import Action, Integration
 
 _UNIT = re.compile(r"^[A-Za-z0-9@._:\\-]+$")
@@ -80,7 +80,7 @@ class SystemdIntegration(Integration):
             base = f"{self.base_topic}/{slug}"
             self.agent._sensor_discovery(
                 f"systemd_{slug}",
-                item_name(self.agent.device_slug, label, "service", "Systemd"),
+                f"{label} service",
                 f"{base}/state",
                 icon="mdi:cog-outline",
                 attributes_topic=f"{base}/attributes",

@@ -5,7 +5,6 @@ import time
 
 from modules import proxmox as pve
 
-from ..shared import item_name
 from .base import Action, Integration
 
 _GUEST_VERBS = {
@@ -74,7 +73,7 @@ class ProxmoxIntegration(Integration):
         vmid = g["vmid"]
         self.agent._sensor_discovery(
             f"proxmox_guest_{vmid}",
-            item_name(self.agent.device_slug, g["name"], f"({vmid})", "Proxmox"),
+            f"{g['name']} ({vmid})",
             f"{self._guest_topic(vmid)}/state",
             icon="mdi:monitor" if g["kind"] == "qemu" else "mdi:cube-outline",
             attributes_topic=f"{self._guest_topic(vmid)}/attributes",

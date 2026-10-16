@@ -31,14 +31,6 @@ def entity_object_id(object_id):
     )
 
 
-def item_name(device_slug, item, suffix, component):
-    name = f"{item} {suffix}".strip()
-    slug = slugify(name)
-    if device_slug and (slug == device_slug or slug.startswith(f"{device_slug}_")):
-        return f"{component} {name}"
-    return name
-
-
 _SUDO_SHIM = (
     'sudo() { while [ $# -gt 0 ]; do case "$1" in -u|-g|-p|-C|-h|-U) shift 2;; --) shift; break;; '
     '-*) shift;; *) break;; esac; done; "$@"; }; '
