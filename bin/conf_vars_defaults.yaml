@@ -160,7 +160,7 @@ lm_sensors:
 #################################
 
 docker:
-  enabled: true
+  enabled: false
   compose_files:
     - "/container-data/compose.yaml"
   update_interval: 60
