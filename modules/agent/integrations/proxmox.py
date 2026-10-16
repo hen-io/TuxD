@@ -27,6 +27,7 @@ class ProxmoxIntegration(Integration):
         self._announced = set()
         self._cancel = threading.Event()
         self._job = ""
+        self._cancellable = False
         self._units = {}
         self._error = ""
         self._lock = threading.Lock()
@@ -129,7 +130,7 @@ class ProxmoxIntegration(Integration):
 
     def _order_state(self, job):
         if not pve.job_settings(self.cfg, job)[0]:
-            return "off"
+            return "Proxmox built-in"
         unit = self._units.get(job, "")
         return "on, at " + ("boot" if job == "start" else "shutdown") if unit == "installed" else f"on (unit: {unit or 'unknown'})"
 
@@ -147,12 +148,11 @@ class ProxmoxIntegration(Integration):
             raise ValueError("Unknown guest")
 
     def actions(self):
-        actions = []
-        if pve.job_settings(self.cfg, "start")[0]:
-            actions.append(Action("bulk_start", "Bulk start guests", "mdi:play-box-multiple-outline", confirm=True))
-        if pve.job_settings(self.cfg, "stop")[0]:
-            actions.append(Action("bulk_stop", "Bulk stop guests", "mdi:stop-circle-outline", confirm=True))
-        if self._job:
+        actions = [
+            Action("bulk_start", "Bulk start guests", "mdi:play-box-multiple-outline", confirm=True),
+            Action("bulk_stop", "Bulk stop guests", "mdi:stop-circle-outline", confirm=True),
+        ]
+        if self._job and self._cancellable:
             actions.append(Action("cancel_job", "Cancel bulk job", "mdi:cancel"))
         targets = [self._label(v) for v, g in sorted(self._guests.items()) if not g["template"]]
         if targets:
@@ -188,6 +188,7 @@ class ProxmoxIntegration(Integration):
                 raise RuntimeError("A Proxmox bulk job is already running")
             self._job = self.tr("Bulk start") if job == "start" else self.tr("Bulk stop")
         self._cancel.clear()
+        self._cancellable = pve.job_settings(self.cfg, job)[0]
         self._publish_job()
         self.agent.publish_action_catalog()
 

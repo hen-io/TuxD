@@ -254,7 +254,9 @@ class BulkJob:
         return not self.cancel.wait(timeout=seconds)
 
     def run(self, lock_wait=0):
-        _enabled, order = job_settings(self.cfg, self.job)
+        enabled, order = job_settings(self.cfg, self.job)
+        if not enabled:
+            return self._builtin(lock_wait)
         steps, problems = parse_order(order)
         for problem in problems:
             self._say(f"Proxmox order: {problem} - skipped")
@@ -281,6 +283,20 @@ class BulkJob:
             self.progress("")
             self._say(f"{title}: done" + (f", failed: {', '.join(map(str, self.failed))}" if self.failed else ""))
         return not self.failed
+
+    def _builtin(self, lock_wait):
+        call = "startall" if self.job == "start" else "stopall"
+        title = "Bulk start" if self.job == "start" else "Bulk stop"
+        with _Lock(lock_wait):
+            self.progress(f"{title} (Proxmox)")
+            self._say(f"{title}: Proxmox built-in ({call})")
+            rc, out = self.runner(["pvesh", "create", f"/nodes/localhost/{call}"], timeout=max_runtime(self.cfg, self.job))
+            for line in out.splitlines():
+                if line.strip():
+                    self.log(line)
+            self.progress("")
+            self._say(f"{title}: " + ("done" if rc == 0 else f"failed ({rc})"))
+        return rc == 0
 
     def _label(self, vmid, guests):
         g = guests.get(vmid)

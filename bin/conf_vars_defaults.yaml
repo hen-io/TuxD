@@ -270,7 +270,7 @@ proxmox:
   # One sensor per VM / container on this node (its status).
   guest_sensors: true
   # Bulk start guests (an action), and at boot in place of Proxmox's own
-  # start. Steps: start_vm (an id, a list or "all"), delay (90s, 2m),
+  # start. Not enabled: the action is Proxmox's own bulk start. Steps: start_vm (an id, a list or "all"), delay (90s, 2m),
   # wait. "all" = every guest with "Start at boot", in Proxmox's startup
   # order, except those a later step names.
   bulk_start_vms:
@@ -279,7 +279,8 @@ proxmox:
     order: []
   # Bulk stop guests (an action), before TuxD's Reboot / Shutdown, and at
   # every shutdown in place of Proxmox's own (the boot / shutdown units need
-  # TuxD to run as root). Steps: stop_vm, delay, wait (until the guests
+  # TuxD to run as root). Not enabled: the action is Proxmox's own bulk
+  # stop. Steps: stop_vm, delay, wait (until the guests
   # stopped above are down). Shutdowns run in parallel.
   bulk_stop_vms:
     enabled: false
