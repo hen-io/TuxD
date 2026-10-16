@@ -73,6 +73,8 @@ class SystemdIntegration(Integration):
 
     def register(self):
         device_slug = self.agent.device_slug
+        if hasattr(self.agent, "forget_stack_alerts"):
+            self.agent.forget_stack_alerts("systemd")
         for label, scope, unit in self.services():
             slug = self._slug(scope, unit)
             base = f"{self.base_topic}/{slug}"
@@ -88,7 +90,7 @@ class SystemdIntegration(Integration):
 
     def poll(self):
         services = self.services()
-        failed = []
+        failed = {}
         for scope in ("system", "user"):
             units = [unit for _, s, unit in services if s == scope]
             if not units:
@@ -110,17 +112,9 @@ class SystemdIntegration(Integration):
                     "description": info.get("Description", ""),
                     "since": info.get("ActiveEnterTimestamp", ""),
                 }))
-                if state in ("failed", "not-found"):
-                    failed.append(f"{self._label(scope, unit)} {state}")
-        self._alert(failed)
-
-    def _alert(self, failed):
-        level = str(self.cfg.get("failed_alert", "warning")).strip().lower()
-        reason = "Service: " + ", ".join(failed) if failed else ""
-        agent = self.agent
-        if hasattr(agent, "set_standing_warning"):
-            agent.set_standing_warning("systemd", reason if level == "warning" else "")
-            agent.set_standing_error("systemd", reason if level == "error" else "")
+                failed[self._label(scope, unit)] = state in ("failed", "not-found")
+        if hasattr(self.agent, "sync_stack_alerts"):
+            self.agent.sync_stack_alerts("systemd", failed)
 
     def actions(self):
         targets = [label for label, _, _ in self.services()]

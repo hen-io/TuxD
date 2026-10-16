@@ -237,11 +237,16 @@ tugboat:
 systemd:
   enabled: false
   update_interval: 30
-  # A listed service that fails raises the host's warning (off | warning | error).
-  failed_alert: "warning"
   # Only these are watched and can be started, stopped, restarted, enabled
   # or disabled from Home Assistant. "user:" in front = a user service.
   services: []
+  # A listed service that fails raises the host's warning or error (default:
+  # off | warning | error). enabled adds a select per service to change it
+  # from Home Assistant; the selects fill in "services".
+  service_alerts:
+    enabled: true
+    default: "warning"
+    services: {}
 
 # Example:
 # systemd:
@@ -250,6 +255,10 @@ systemd:
 #     - "nginx.service"
 #     - "docker"
 #     - "user:syncthing.service"
+#   service_alerts:
+#     default: "warning"
+#     services:
+#       nginx.service: "error"
 
 #################################
 # Actions                       #

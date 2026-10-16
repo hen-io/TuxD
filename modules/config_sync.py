@@ -272,6 +272,17 @@ def _migrate_password(config: dict) -> bool:
     return True
 
 
+def _migrate_failed_alert(config: dict) -> bool:
+    systemd = config.get('systemd')
+    if not isinstance(systemd, dict) or 'failed_alert' not in systemd:
+        return False
+    level = systemd.pop('failed_alert')
+    alerts = systemd.setdefault('service_alerts', {})
+    if isinstance(alerts, dict) and 'default' not in alerts:
+        alerts['default'] = level
+    return True
+
+
 def _migrate_power_buttons(config: dict) -> bool:
     buttons = config.get('button')
     device = config.get('device')
@@ -451,6 +462,8 @@ def sync_config(config_path: str, conf_vars_path: str, item_defaults_path: str =
                 item_defaults = {}
 
     migration_changed = _migrate_interval_keys(config)
+    if _migrate_failed_alert(config):
+        migration_changed = True
     if _remove_retired(config):
         migration_changed = True
     yaml_changed = _deep_merge_defaults(config, defaults)

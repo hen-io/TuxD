@@ -8,6 +8,8 @@ _NB = {
     "Select target...": "Velg mål...",
     "Target": "Mål",
     "Systemd services": "Systemd-tjenester",
+    "Failed services": "Feilede tjenester",
+    "Alert": "Varsling",
     "Service": "Tjeneste",
     "Stack": "Stack",
     "Enable": "Aktiver",
