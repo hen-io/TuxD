@@ -51,7 +51,7 @@ mqtt:
 device:
   name: ""
   # en | nb - language of built-in entity names. Entity ids are not affected.
-  language: "en"
+  language: nb"
   tty_output: false
   refresh_entities: 300
   sampling_interval: 1

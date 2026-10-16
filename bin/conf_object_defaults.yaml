@@ -1,3 +1,6 @@
+device:
+  language: nb"
+
 select:
   write_to_terminal: true
 
