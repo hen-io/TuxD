@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 
 from .shared import slugify as _slug
-from modules.tugboat import ACTIONS, list_backups, read_status, run_command, stack_names, status_file_path
+from modules.tugboat import ACTIONS, HOST_ACTIONS, list_backups, read_status, run_command, stack_names, status_file_path
 
 LOCAL_ICON_TYPES = {".png": "image/png", ".svg": "image/svg+xml", ".webp": "image/webp",
                     ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif"}
@@ -265,15 +265,8 @@ class TugboatMixin:
                 "summary": info.get("summary", ""),
                 "problems": info.get("problems", []),
                 "checked_at": info.get("checked_at", ""),
-                "containers": [
-                    {
-                        "name": c.get("name"),
-                        "state": c.get("state"),
-                        "health": c.get("health"),
-                        "status": c.get("status"),
-                    }
-                    for c in (info.get("containers") or []) if isinstance(c, dict)
-                ],
+                "containers": [self._tugboat_container(c) for c in (info.get("containers") or []) if isinstance(c, dict)],
+                "path": info.get("path", ""),
                 "last_action": info.get("last_action", {}),
                 "last_update": info.get("last_update", ""),
                 "last_backup": info.get("last_backup", ""),
@@ -290,25 +283,46 @@ class TugboatMixin:
             for name, info in stacks.items() if isinstance(info, dict)
         })
 
+    @staticmethod
+    def _tugboat_container(c):
+        out = {k: c.get(k) for k in ("name", "state", "health", "status")}
+        out.update({k: c[k] for k in ("service", "image", "exit_code", "error", "image_version",
+                                      "update_available", "latest_version") if k in c})
+        url = c.get("icon_url")
+        if isinstance(url, str) and url.startswith(("https://", "http://")):
+            out["icon_url"] = url
+        return out
+
     def _publish_tugboat_version(self, status):
-        version = str(status.get("tugboat_version") or "").strip()
+        block = status.get("tugboat") if isinstance(status.get("tugboat"), dict) else {}
         check = status.get("release_check") if isinstance(status.get("release_check"), dict) else {}
-        latest = str(check.get("latest") or "").strip()
+        version = str(block.get("version") or status.get("tugboat_version") or "").strip()
+        latest = str(block.get("latest_version") or check.get("latest") or "").strip()
+        if "update_available" in block:
+            newer = bool(block["update_available"] and version and latest)
+        else:
+            newer = bool(version and latest and self._version_key(latest) > self._version_key(version))
+        url = str(block.get("release_url") or "").strip()
+        url = url if url.startswith(("https://", "http://")) else "https://github.com/hen-io/TugBoat/releases"
+        error = str(block.get("check_error") or "").strip()
         self._tugboat_publish(f"{self.base_topic}/tugboat/version", version or "unknown")
         self._tugboat_publish(f"{self.base_topic}/tugboat/version_attributes", json.dumps({
             "latest_version": latest,
-            "update_available": bool(version and latest and latest != version
-                                     and self._version_key(latest) > self._version_key(version)),
-            "checked_at": check.get("checked_at", ""),
+            "update_available": newer,
+            "checked_at": block.get("checked_at") or check.get("checked_at", ""),
+            "release_url": url,
+            "release_date": block.get("release_date", ""),
+            "check_error": error,
         }))
-        newer = bool(version and latest and self._version_key(latest) > self._version_key(version))
         self._tugboat_self_update_state = {
             "installed_version": version or "unknown",
             "latest_version": latest if newer else (version or "unknown"),
             "title": "TugBoat",
-            "release_url": "https://github.com/hen-io/TugBoat/releases",
+            "release_url": url,
             "in_progress": False,
         }
+        if error:
+            self._tugboat_self_update_state["release_summary"] = f"Release check failed: {error}"[:255]
         self._tugboat_publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(self._tugboat_self_update_state))
 
     @staticmethod
@@ -473,28 +487,36 @@ class TugboatMixin:
         ).start()
 
     def handle_tugboat_self_update(self, wait=False):
+        return self.run_tugboat_host_action("Update TugBoat", wait)
+
+    def run_tugboat_host_action(self, label, wait=False):
+        args, check_after = HOST_ACTIONS[label]
         if not self._tugboat_active() or not self._tugboat_claim():
             return False
+        self_update = label == "Update TugBoat"
         state = getattr(self, "_tugboat_self_update_state", None)
-        if state:
+        if self_update and state:
             self.publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(dict(state, in_progress=True)))
 
         def work():
             show = self._terminal_output_enabled()
             on_line = (lambda line: line and self.publish(self.terminal_output_topic, line)) if show else None
+            name = self.tr(label)
             try:
-                with self.busy("tugboat: self-update"):
+                with self.busy(f"tugboat: {name}"):
                     if show:
-                        self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: TugBoat self-update')
-                    run_command(self._tugboat_python_bin, self._tugboat_path, "--self-update", None, on_line=on_line)
-                    run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", None)
+                        self.publish(self.terminal_output_topic, f'{time.strftime("%H:%M:%S")}: TugBoat {name}')
+                    run_command(self._tugboat_python_bin, self._tugboat_path, args[0], None,
+                                extra=args[1:], on_line=on_line, auto=False)
+                    if check_after:
+                        run_command(self._tugboat_python_bin, self._tugboat_path, "--healthcheck", None, auto=False)
                 status = read_status(self._tugboat_path)
                 if status:
                     self._publish_tugboat_status(status)
             finally:
                 self._tugboat_running = False
                 state = getattr(self, "_tugboat_self_update_state", None)
-                if state:
+                if self_update and state:
                     self.publish(f"{self.base_topic}/tugboat/self_update/state", json.dumps(state))
         if wait:
             work()

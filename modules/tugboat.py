@@ -16,6 +16,15 @@ ACTIONS = {
     "Health Check": "--healthcheck",
 }
 
+HOST_ACTIONS = {
+    "Check images": (("--healthcheck", "--check-images"), False),
+    "Update outdated stacks": (("--auto", "--only-outdated"), False),
+    "Check for TugBoat update": (("--check-update",), True),
+    "Update TugBoat": (("--self-update",), True),
+    "Soft reset": (("--soft-reset",), True),
+    "Run fixes": (("--run-fixes",), True),
+}
+
 DEFAULT_STATUS_FILES = (".TugBoat/tugboat.json", "TugBoat/tugboat.json", "tugboat.json")
 CONF_FILES = (".TugBoat/TugBoat.conf", "TugBoat/TugBoat.conf", "TugBoat.conf")
 
@@ -58,19 +67,19 @@ def stack_names(status):
     return sorted(status.get("stacks", {}).keys())
 
 
-def build_command(python_bin, path, action_flag, stack=None, extra=()):
+def build_command(python_bin, path, action_flag, stack=None, extra=(), auto=True):
     return (
         f"cd {shlex.quote(path)} && "
         f"{python_bin} TugBoat.py {action_flag}"
         + (f" --stack {shlex.quote(stack)}" if stack else "")
-        + " --auto"
+        + (" --auto" if auto else "")
         + "".join(f" {shlex.quote(a)}" for a in extra)
     )
 
 
-def run_command(python_bin, path, action_flag, stack, timeout=1800, extra=(), on_line=None):
+def run_command(python_bin, path, action_flag, stack, timeout=1800, extra=(), on_line=None, auto=True):
     from modules.agent.shared import stream_cmd
-    cmd = build_command(python_bin, path, action_flag, stack, extra)
+    cmd = build_command(python_bin, path, action_flag, stack, extra, auto)
     try:
         return stream_cmd(cmd, on_line, timeout=timeout)
     except Exception as e:
