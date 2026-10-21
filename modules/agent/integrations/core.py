@@ -25,6 +25,8 @@ class CoreIntegration(Integration):
                     Action("update_and_reboot_if_needed", "Update and reboot if needed", "mdi:restart", confirm=True),
                     Action("update_and_reboot", "Update and reboot", "mdi:restart-alert", confirm=True),
                 ]
+        if (self.agent.config.get("lm_sensors") or {}).get("enabled", False):
+            actions.append(Action("lm_discover", "Discover lm-sensors", "mdi:thermometer-auto"))
         actions += [
             Action("reboot", "Reboot", "mdi:restart", confirm=True),
             Action("shutdown", "Shutdown", "mdi:power", confirm=True),
@@ -43,5 +45,7 @@ class CoreIntegration(Integration):
             agent.handle_host_update_check()
         elif action_id in ("update", "update_and_reboot_if_needed", "update_and_reboot"):
             agent.handle_host_update_button(action_id)
+        elif action_id == "lm_discover":
+            agent.run_lm_discovery()
         elif action_id in ("reboot", "shutdown"):
             agent.handle_custom_button(f"{agent.base_topic}/custom_button/{action_id}/set")

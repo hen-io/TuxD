@@ -106,7 +106,6 @@ class SelfUpdateMixin:
             if not new_version or not src_type or not src_val:
                 return
             self._set_self_update_progress(True)
-            self.set_warning(True, "TuxD Agent update installing, restarting")
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"Installing TuxD {new_version}...")
             self._update_applier(new_version, src_type, src_val)
@@ -136,7 +135,6 @@ class SelfUpdateMixin:
     def _run_self_update_install_from_url(self, url):
         try:
             self._set_self_update_progress(True)
-            self.set_warning(True, "TuxD Agent update installing (offline tarball), restarting")
             if self._terminal_output_enabled():
                 self.publish(self.terminal_output_topic, f"Installing TuxD from {url}...")
             self._update_applier("offline-tarball", "url", url)

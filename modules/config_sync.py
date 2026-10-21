@@ -60,6 +60,9 @@ _REWRITES = [
     ("2026-10-14-install-reboot-if-needed", [
         (("host_update", "install_button_name"), "Update and reboot if needed", "Update and reboot"),
     ]),
+    ("2026-10-21-language-quote", [
+        (("device", "language"), "nb", 'nb"'),
+    ]),
 ]
 
 

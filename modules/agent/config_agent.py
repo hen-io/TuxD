@@ -166,7 +166,6 @@ class ConfigAgentMixin:
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
                 self.publish(self.terminal_output_topic, f"{ts}: Restarting TuxD...")
                 time.sleep(0.5)
-            self.set_warning(True, "Configuration changed")
         except Exception:
             pass
         try:

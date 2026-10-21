@@ -296,8 +296,6 @@ class HostUpdateMixin:
         name = _STANDARD_BUTTONS[slug][0]
         out = ""
         try:
-            if slug == "update_and_reboot":
-                self.set_warning(True, f'"{name}" button triggered a reboot/shutdown')
             self._set_host_update_progress(True)
             with self.busy(f"button: {name}"):
                 out = self.run_to_terminal(cmd, f'Button "{name}" pressed!', timeout=self._install_timeout())
@@ -315,13 +313,6 @@ class HostUpdateMixin:
                 self._set_host_update_progress(False)
         except Exception:
             self._set_host_update_progress(False)
-        try:
-            if "rebooting in 1 minute" in (out or ""):
-                self.set_warning(True, f'"{name}": rebooting after the updates')
-            elif slug == "update_and_reboot":
-                self.set_warning(False)
-        except Exception:
-            pass
 
     def handle_host_update_install(self):
         cfg = self.config.get("host_update", {}) or {}
@@ -340,10 +331,6 @@ class HostUpdateMixin:
 
     def _run_host_update_install(self, cmd):
         self._set_host_update_progress(True)
-        try:
-            self.set_warning(True, "Host update running - host may reboot")
-        except Exception:
-            pass
         try:
             with self.busy("host update"):
                 self.run_to_terminal(cmd, "Installing host updates", timeout=self._install_timeout())

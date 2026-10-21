@@ -93,12 +93,6 @@ class CustomEntitiesMixin:
                     ts = datetime.datetime.now().strftime("%H:%M:%S")
                     msg = f'{ts}: Button "{b["name"]}" pressed! > {cmd}'
                     self.publish(self.terminal_output_topic, msg)
-                cmd_lower = cmd.lower()
-                if any(kw in cmd_lower for kw in ("shutdown", "reboot", "poweroff", "halt")):
-                    try:
-                        self.set_warning(True, f'"{b["name"]}" button triggered a reboot/shutdown')
-                    except Exception:
-                        pass
                 power = slug if slug in _POWER_BUTTONS and hasattr(self, "before_power_off") else None
                 if write_to_terminal:
                     def _run(c=cmd, n=b["name"]):

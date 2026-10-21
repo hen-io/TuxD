@@ -31,6 +31,7 @@ _NB = {
     "Restart agent": "Start agenten på nytt",
     "Check for agent updates": "Se etter agentoppdateringer",
     "Check host updates": "Se etter systemoppdateringer",
+    "Discover lm-sensors": "Finn lm-sensors",
     "Select stack...": "Velg stack...",
     "Select action...": "Velg handling...",
     "All stacks": "Alle stacks",

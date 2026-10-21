@@ -20,7 +20,7 @@ import re
 import collections
 import traceback
 
-VERSION = "1.7.38"
+VERSION = "1.8.0"
 
 CONFIG_PATH = "tuxd.conf"
 LOG_FILE_PATH = "tuxd.log"
@@ -1218,11 +1218,6 @@ def _cleanup_terminal():
     log_write("Shutting down TuxD.")
 
     if _AGENT is not None:
-        try:
-            _AGENT.set_error(True, _AGENT.tr("Agent is offline!"))
-            time.sleep(0.5)
-        except Exception:
-            pass
         try:
             _AGENT.stop()
         except Exception:

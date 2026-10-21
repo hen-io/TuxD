@@ -79,7 +79,7 @@ class SystemStatusMixin:
         self.publish(f"{self.base_topic}/warning", "ON" if self._warning_active else "OFF")
         self.publish(
             f"{self.base_topic}/warning_attributes",
-            json.dumps({"reason": self._warning_reason}),
+            json.dumps({"reason": self._warning_reason, "sources": self._sources(self._standing_warnings, self._warning_active, self._warning_reason)}),
         )
         self.publish(f"{self.base_topic}/warning_reason", self._warning_reason)
 
@@ -87,11 +87,19 @@ class SystemStatusMixin:
         self._error_active = bool(active)
         self._error_reason = reason if active else ""
         self.publish(f"{self.base_topic}/error", "ON" if self._error_active else "OFF")
+        standing = dict(self._standing_errors, **({"agent": self._startup_error} if self._startup_error else {}))
         self.publish(
             f"{self.base_topic}/error_attributes",
-            json.dumps({"reason": self._error_reason}),
+            json.dumps({"reason": self._error_reason, "sources": self._sources(standing, self._error_active, self._error_reason)}),
         )
         self.publish(f"{self.base_topic}/error_reason", self._error_reason)
+
+    @staticmethod
+    def _sources(standing, active, reason):
+        if not active:
+            return {}
+        sources = {k: v for k, v in standing.items() if v}
+        return sources or {"agent": reason}
 
     def _standing_error(self):
         reasons = [self._startup_error] + list(self._standing_errors.values())

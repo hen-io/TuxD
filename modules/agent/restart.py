@@ -59,10 +59,6 @@ class RestartMixin:
                         self.log_file.flush()
                     except Exception:
                         pass
-                try:
-                    self.set_warning(True, "Restart button pressed")
-                except Exception:
-                    pass
                 time.sleep(1.0)
             except Exception as e:
                 print(f"TuxD: restart handler failed before restarting ({e!r}) - restarting anyway")
