@@ -1,7 +1,6 @@
 import json
 import re
 import subprocess
-import time
 
 _KINDS = (
     ("temp", "°C", "temperature", "mdi:thermometer"),
@@ -59,34 +58,24 @@ def describe(chip, section, key):
     return None, None, "mdi:gauge"
 
 
-def discover_active(window=10.0, interval=2.0, stop_event=None, sample=None):
-    sample = sample or _sensors_json
-    first = _flatten(sample())
-    seen = {k: {v[3]} for k, v in first.items() if _INPUT.match(v[2])}
-    deadline = time.monotonic() + max(0.0, float(window))
-    while time.monotonic() < deadline:
-        if stop_event is not None and stop_event.wait(timeout=interval):
-            return {}
-        if stop_event is None:
-            time.sleep(interval)
-        for k, v in _flatten(sample()).items():
-            if k in seen:
-                seen[k].add(v[3])
-    active = [k for k, values in seen.items() if len(values) > 1]
+def discover_sensors(sample=None):
+    flat = _flatten((sample or _sensors_json)())
+    temps = sorted(k for k, v in flat.items() if (_INPUT.match(v[2]) or [None, ""])[1] == "temp")
     sections = {}
-    for k in active:
-        sections.setdefault(first[k][1], []).append(k)
+    for k in temps:
+        sections.setdefault(flat[k][1], []).append(k)
     names = {}
-    for k in active:
-        chip, section, key, _value = first[k]
+    for k in temps:
+        chip, section, key, _value = flat[k]
         names[k] = section if len(sections[section]) == 1 else f"{section} ({chip})"
     counts = {}
     for name in names.values():
         counts[name] = counts.get(name, 0) + 1
     found = {}
-    for k in sorted(active):
-        chip, section, key, _value = first[k]
+    for k in temps:
+        chip, section, key, _value = flat[k]
         unit, device_class, icon = describe(chip, section, key)
         name = names[k] if counts[names[k]] == 1 else f"{names[k]} {key}"
-        found[k] = {"name": name, "unit_of_measurement": unit, "device_class": device_class, "icon": icon}
+        found[k] = {"enabled": True, "name": name, "unit_of_measurement": unit,
+                    "device_class": device_class, "icon": icon}
     return found

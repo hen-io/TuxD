@@ -1,7 +1,7 @@
 import threading
 import time
 
-from modules.lm_sensors import discover_active, read_lm_sensors
+from modules.lm_sensors import discover_sensors, read_lm_sensors
 
 
 class LMSensorsMixin:
@@ -54,14 +54,8 @@ class LMSensorsMixin:
             raise RuntimeError("lm-sensors discovery is already running")
         try:
             say = self._lm_say
-            lm_cfg = self._lm_cfg()
-            try:
-                window = float(lm_cfg.get("auto_discovery_window", 10))
-            except (TypeError, ValueError):
-                window = 10.0
             with self.busy("lm-sensors: discovery"):
-                say(f"lm-sensors: looking for live readings ({window:g}s)...")
-                found = discover_active(window=window, stop_event=self._stop_event)
+                found = discover_sensors()
                 added = {}
 
                 def change(cfg):
@@ -70,8 +64,7 @@ class LMSensorsMixin:
                         section["sensors"] = {}
                     for raw_key, meta in found.items():
                         if raw_key not in section["sensors"]:
-                            entry = {"enabled": True}
-                            entry.update({k: v for k, v in meta.items() if v is not None})
+                            entry = {k: v for k, v in meta.items() if v is not None}
                             section["sensors"][raw_key] = entry
                             added[raw_key] = entry
                     section["auto_discovery"] = False
@@ -86,8 +79,9 @@ class LMSensorsMixin:
                 self.register_lm_sensors()
                 self._lm_generation = getattr(self, "_lm_generation", 0) + 1
                 self._lm_start_loop()
-            names = ", ".join(sorted(meta.get("name", k) for k, meta in added.items()))
-            say(f"lm-sensors: {len(found)} live reading(s), {len(added)} added" + (f": {names}" if names else ""))
+            names = ", ".join(sorted(e.get("name", k) for k, e in added.items()))
+            say(f"lm-sensors: {len(found)} temperature sensor(s), {len(added)} added to tuxd.conf"
+                + (f": {names}" if names else ""))
             return len(added)
         finally:
             lock.release()
